@@ -53,3 +53,5 @@ ARPACK-NG is a fortran library for sparse eigen solvers. It has the following is
     - [Implicit application of polynomial filters in a k-step Arnoldi method](https://ntrs.nasa.gov/api/citations/19930004220/downloads/19930004220.pdf)
         - [An Implicitly Restarted Lanczos Method for Large Symmetric Eigenvalue Problems](http://etna.mcs.kent.edu/vol.2.1994/pp1-21.dir/pp1-21.ps):
           a specialization of the implicit ARNOLDI to the hermitian operator case.
+    - [Thick-Restart Lanczos Method For Large Symmetric Eigen Values Problems](https://sdm.lbl.gov/~kewu/ps/trlan-siam.pdf): a special case of Krylov-Schur for Hermitian o
+perators
