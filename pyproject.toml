@@ -1,0 +1,19 @@
+[project]
+name = "arnoldi"
+description = "A Krylov-Schur implementation of eigensolver for sparse matrices"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "David Cournapeau", email = "cournape@gmail.com" }
+]
+dependencies = [
+    "numpy>=2.0",
+]
+dynamic = ["version"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/arnoldi/__version__.py"

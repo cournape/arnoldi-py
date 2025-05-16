@@ -1,8 +1,9 @@
-# arpack-py
+# Arnoldi
 
-This is an attempt to write an eigensolver for sparse matrices without
-depending on ARPACK. Ultimately, the hope is to be a viable replacement for
-scipy.sparse.eigen.arpack, and remove the fortran dependency.
+This is an attempt to write an eigensolver for sparse matrices that only relies
+on NumPy and BLAS/LAPACK, without depending on ARPACK. Ultimately, the hope is
+to be a viable replacement for scipy.sparse.eigen, and remove the fortran
+dependency.
 
 ## Why ?
 
