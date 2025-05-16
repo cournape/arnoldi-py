@@ -16,7 +16,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.version]
-path = "src/arnoldi/__version__.py"
+path = "src/arnoldi/_version.py"
 
 [dependency-groups]
 dev = [
