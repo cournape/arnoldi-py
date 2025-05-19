@@ -14,6 +14,20 @@ ARPACK-NG is a fortran library for sparse eigen solvers. It has the following is
   large problems, e.g. A Krylov-Schur Algorithm for Large Eigenproblems, G. W.
   Stewart, SIAM J. M ATRIX A NAL. A PPL ., Vol. 23, No. 3, pp. 601–614
 
+## TODO
+
+- [ ] Basic support for symmetric/hermitian matrices, largest eigen values only
+    - [ ] add a basic set of test matrices, using sparse matrix suite + synthetic
+    - [ ] add basic unrestarted Lanczos algorithm
+    - [ ] add convergence tracking on Ritz values
+    - [ ] add block + full reortho
+    - [ ] try implicit / explicit restart (notebooks)
+    - [ ] add locking / deflate
+    - [ ] partial reorthogonalization
+    - [ ] try krylov-schur method
+- [ ] add support for shift-invert (arbitrary eigen values)
+- [ ] extend to Hermitian/symmetric matrices (Arnoldi)
+
 ## Existing alternative implementations
 
 - matlab:
@@ -39,3 +53,5 @@ ARPACK-NG is a fortran library for sparse eigen solvers. It has the following is
     - [Implicit application of polynomial filters in a k-step Arnoldi method](https://ntrs.nasa.gov/api/citations/19930004220/downloads/19930004220.pdf)
         - [An Implicitly Restarted Lanczos Method for Large Symmetric Eigenvalue Problems](http://etna.mcs.kent.edu/vol.2.1994/pp1-21.dir/pp1-21.ps):
           a specialization of the implicit ARNOLDI to the hermitian operator case.
+    - [Thick-Restart Lanczos Method For Large Symmetric Eigen Values Problems](https://sdm.lbl.gov/~kewu/ps/trlan-siam.pdf): a special case of Krylov-Schur for Hermitian o
+perators
