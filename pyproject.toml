@@ -23,3 +23,6 @@ dev = [
     "notebook>=7.4.2",
     "scipy>=1.15.3",
 ]
+test = [
+    "pytest>=8.3.5",
+]
