@@ -25,4 +25,8 @@ dev = [
 ]
 test = [
     "pytest>=8.3.5",
+    "pytest-cov>=6.2.1",
 ]
+
+[tool.pytest.ini_options]
+addopts = "--cov=arnoldi --cov-report=term-missing --cov-branch"
