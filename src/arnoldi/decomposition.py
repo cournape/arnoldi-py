@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.linalg as slin
 import scipy.sparse as sp
 
 
@@ -13,16 +14,24 @@ class Arnoldi:
         self.q = np.zeros((n, k+1), dtype=dtype)
         self.h = np.zeros((k+1, k), dtype=dtype)
 
-        self.dtype = dtype
+    @property
+    def _dtype(self):
+        return self.h.dtype
+
+    @property
+    def _atol(self):
+        # XXX: logic of sqrt copied from Julia's ArnoldiMethod.jl package
+        return np.sqrt(np.finfo(self._dtype).eps)
 
     def initialize(self, init_vector=None):
         if init_vector is None:
-            init_vector = np.random.randn(self.n).astype(self.dtype)
+            init_vector = np.random.randn(self.n).astype(self._dtype)
             init_vector /= np.linalg.norm(init_vector)
 
         self.q[:, 0] = init_vector
 
-    def iterate(self, a, tol=1e-12):
+    def iterate(self, a, tol=None):
+        tol = tol or self._atol
         for j in range(self.k):
             v = self.q[:, j+1]
             v[:] = a @ self.q[:, j]
@@ -34,7 +43,7 @@ class Arnoldi:
 
             self.h[j + 1, j] = np.linalg.norm(v)
 
-            if self.h[j + 1, j] < tol:
+            if self.h[j + 1, j] < self._atol:
                 return j
             v /= self.h[j + 1, j]
 

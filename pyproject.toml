@@ -8,6 +8,7 @@ authors = [
 ]
 dependencies = [
     "numpy>=2.0",
+    "scipy>=1.15.3",
 ]
 dynamic = ["version"]
 
@@ -21,8 +22,11 @@ path = "src/arnoldi/_version.py"
 [dependency-groups]
 dev = [
     "notebook>=7.4.2",
-    "scipy>=1.15.3",
 ]
 test = [
     "pytest>=8.3.5",
+    "pytest-cov>=6.2.1",
 ]
+
+[tool.pytest.ini_options]
+addopts = "--cov=arnoldi --cov-report=term-missing --cov-branch"
