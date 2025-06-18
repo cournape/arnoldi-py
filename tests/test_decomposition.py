@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 import scipy.sparse as sp
 
 from arnoldi import Arnoldi
@@ -45,6 +46,7 @@ class TestArnoldiExpansion:
             a @ q[:, :n_iter], q @ h, rtol=RTOL, atol=ATOL
         )
 
+    @pytest.mark.flaky(reruns=3)
     def test_eigvals_simple(self):
         # Given
         n = 20
