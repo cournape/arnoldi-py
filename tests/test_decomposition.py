@@ -99,9 +99,7 @@ class TestArnoldiExpansion:
     def test_residuals_computation(self):
         ## Given
         n = 20
-        # We use large krylov space since basic arnoldi does not converge
-        # quickly. Once we implement restarts, it should converge much faster
-        k = n - 1
+        k = 6
         n_ev = 3
 
         a = sp.random(n, n, density=5 / n, dtype=np.complex128)
