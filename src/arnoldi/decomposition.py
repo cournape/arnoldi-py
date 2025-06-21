@@ -1,6 +1,4 @@
 import numpy as np
-import scipy.linalg as slin
-import scipy.sparse as sp
 
 
 class Arnoldi:
