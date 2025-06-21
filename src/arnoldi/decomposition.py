@@ -20,7 +20,7 @@ class Arnoldi:
 
     @property
     def _atol(self):
-        # XXX: logic of sqrt copied from Julia's ArnoldiMethod.jl package
+        # Logic of sqrt copied from Julia's ArnoldiMethod.jl package
         return np.sqrt(np.finfo(self._dtype).eps)
 
     def initialize(self, init_vector=None):
@@ -48,3 +48,14 @@ class Arnoldi:
             v /= self.h[j + 1, j]
 
         return self.k
+
+    def _extract_arnold_decomp(self, size=None):
+        """ Return Q_k/H_k such as Q_k^H A Q_k = H_k.
+        """
+        q, h = self.q, self.h
+        size = size or self.k
+
+        q_k = q[:, :size]
+        h_k = h[:size, :size]
+
+        return q_k, h_k

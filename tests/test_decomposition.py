@@ -16,34 +16,51 @@ def largest_eigvals(m, k):
     return np.array(sorted(r_eigvals, key=np.abs, reverse=True)[:k])
 
 
+def basis_vector(n, k, dtype=np.int64):
+    """ Create the basis vector e_k in R^n, aka e_k is (n,), and with e_k[k] =
+    1
+    """
+    ret = np.zeros(n, dtype=dtype)
+    ret[k-1] = 1
+    return ret
+
+
 class TestArnoldiExpansion:
     def test_invariant_simple(self):
-        ## Test the invariant A * Q ~ Q * H, with H Hessenberg matrix and Q
-        ## orthonormal
+        # Test the invariant A * Q ~ Q * H, with H Hessenberg matrix and Q
+        # orthonormal
 
-        # Given
+        ## Given
         n = 10
         k = 6
+        dtype = np.complex128
+        e_k = basis_vector(k, k, dtype)
 
-        a = sp.random(n, n, density=5 / n, dtype=np.complex128)
+        a = sp.random(n, n, density=5 / n, dtype=dtype)
         a += sp.diags_array(np.ones(n))
 
-        # When
+        ## When
         arnoldi = Arnoldi(n, k)
         arnoldi.initialize()
         n_iter = arnoldi.iterate(a)
 
-        q, h = arnoldi.q[:, :n_iter+1], arnoldi.h[:n_iter+1, :n_iter+1]
+        q, h = arnoldi.q, arnoldi.h
+        q_k, h_k = arnoldi._extract_arnold_decomp(n_iter)
 
-        # Then
-        ## the Q arnoldi basis is orthonormal
+        ## Then
+        # the arnoldi basis Q is orthonormal
         np.testing.assert_allclose(
             q.conj().T @ q, np.eye(n_iter+1), rtol=RTOL, atol=ATOL
         )
-        ## the arnoldi decomposition invariant is respected
-        remain = a @ q[:, :n_iter] - q @ h
+        # the arnoldi decomposition invariants are respected
         np.testing.assert_allclose(
-            a @ q[:, :n_iter], q @ h, rtol=RTOL, atol=ATOL
+            a @ q_k,
+            q_k @ h_k + h[-1, -1] * np.outer(q[:, -1], e_k),
+            rtol=RTOL, atol=ATOL
+        )
+
+        np.testing.assert_allclose(
+            a @ q[:, :-1], q @ h, rtol=RTOL, atol=ATOL
         )
 
     @pytest.mark.flaky(reruns=3)
