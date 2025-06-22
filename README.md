@@ -16,17 +16,15 @@ ARPACK-NG is a fortran library for sparse eigen solvers. It has the following is
 
 ## TODO
 
-- [ ] Basic support for symmetric/hermitian matrices, largest eigen values only
-    - [ ] add a basic set of test matrices, using sparse matrix suite + synthetic
-    - [ ] add basic unrestarted Lanczos algorithm
-    - [ ] add convergence tracking on Ritz values
-    - [ ] add block + full reortho
-    - [ ] try implicit / explicit restart (notebooks)
-    - [ ] add locking / deflate
-    - [ ] partial reorthogonalization
-    - [ ] try krylov-schur method
+- [ ] Fundamental support for arbitrary matrices, largest eigen values only
+    - [x] basic arnoldi decomp w/ tests
+    - [ ] add a key set of test matrices, using sparse matrix suite + synthetic
+      (Markov, Laplace, etc.)
+    - [ ] convergence tracking on Ritz values
+    - [ ] explicit restart support with deflation
+    - [ ] krylov-schur method
 - [ ] add support for shift-invert (arbitrary eigen values)
-- [ ] extend to Hermitian/symmetric matrices (Arnoldi)
+- [ ] extend to Hermitian/symmetric matrices (Lanczos)
 
 ## Existing alternative implementations
 
