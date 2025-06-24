@@ -2,12 +2,14 @@
 name = "arnoldi"
 description = "A Krylov-Schur implementation of eigensolver for sparse matrices"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 authors = [
     { name = "David Cournapeau", email = "cournape@gmail.com" }
 ]
 dependencies = [
-    "numpy>=2.0",
+    # Adding the macos update to temporarily deal w/ https://github.com/numpy/numpy/issues/28687
+    "numpy>=2.3; sys_platform == 'darwin'",
+    "numpy>=2.0; sys_platform != 'darwin'",
     "scipy>=1.15.3",
 ]
 dynamic = ["version"]
