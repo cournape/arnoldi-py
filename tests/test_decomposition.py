@@ -4,26 +4,19 @@ import pytest
 import scipy.sparse as sp
 
 from arnoldi import Arnoldi
+from arnoldi.decomposition import _largest_eigvals
 
 
 ATOL = 1e-8
 RTOL = 1e-4
 
 
-def largest_eigvals(m, k):
-    """ Compute top k eigenvalues of m, when sorted by amplitude.
-    """
-    vals, vecs = np.linalg.eig(m)
-    idx = np.argsort(-np.abs(vals))[:k]
-    return vals[idx], vecs[:, idx]
-
-
 def basis_vector(n, k, dtype=np.int64):
-    """ Create the basis vector e_k in R^n, aka e_k is (n,), and with e_k[k] =
+    """Create the basis vector e_k in R^n, aka e_k is (n,), and with e_k[k] =
     1
     """
     ret = np.zeros(n, dtype=dtype)
-    ret[k-1] = 1
+    ret[k - 1] = 1
     return ret
 
 
@@ -52,18 +45,17 @@ class TestArnoldiExpansion:
         ## Then
         # the arnoldi basis Q is orthonormal
         np.testing.assert_allclose(
-            q.conj().T @ q, np.eye(n_iter+1), rtol=RTOL, atol=ATOL
+            q.conj().T @ q, np.eye(n_iter + 1), rtol=RTOL, atol=ATOL
         )
         # the arnoldi decomposition invariants are respected
         np.testing.assert_allclose(
             a @ q_k,
             q_k @ h_k + h[-1, -1] * np.outer(q[:, -1], e_k),
-            rtol=RTOL, atol=ATOL
+            rtol=RTOL,
+            atol=ATOL,
         )
 
-        np.testing.assert_allclose(
-            a @ q[:, :-1], q @ h, rtol=RTOL, atol=ATOL
-        )
+        np.testing.assert_allclose(a @ q[:, :-1], q @ h, rtol=RTOL, atol=ATOL)
 
     @pytest.mark.flaky(reruns=3)
     def test_eigvals_simple(self):
@@ -82,15 +74,14 @@ class TestArnoldiExpansion:
         # values not too far from 1
         a += sp.diags_array(np.ones(n))
 
-        r_eigvals, _ = largest_eigvals(a.toarray(), n_ev)
+        r_eigvals, _ = _largest_eigvals(a.toarray(), n_ev)
 
         ## When
         arnoldi = Arnoldi(n, k)
         arnoldi.initialize()
         n_iter = arnoldi.iterate(a)
 
-        q_k, h_k = arnoldi._extract_arnold_decomp(n_iter)
-        ritz_values, _ = largest_eigvals(h_k, n_ev)
+        ritz_values, _ = arnoldi._extract_ritz_decomp(n_ev, n_iter)
 
         ## Then
         # Ensure estimated eigen values approximately match
@@ -107,25 +98,22 @@ class TestArnoldiExpansion:
         # values not too far from 1
         a += sp.diags_array(np.ones(n))
 
-        r_eigvals, _ = largest_eigvals(a.toarray(), n_ev)
-
-        # When
+        ## When
         arnoldi = Arnoldi(n, k)
         arnoldi.initialize()
         n_iter = arnoldi.iterate(a)
 
-        q_k, h_k = arnoldi._extract_arnold_decomp(n_iter)
-        ritz_values, vectors = largest_eigvals(h_k, n_ev)
-        ritz_vectors = q_k @ vectors
-
         ## Then
-        # Ensure residuals match
-        r_residuals = nlin.norm(a @ ritz_vectors - ritz_values * ritz_vectors,
-                                axis=0)
-        # For a given eigen value/vector pair lambda_i / u_i, we have:
-        # ||A u_i - lambda_i u_i|| = h[k, k-1] * |<e_k, v_k>| where u_k = q * v_k
-        #
-        # See e.g. proposition 6.8 of https://www-users.cse.umn.edu/~saad/eig_book_2ndEd.pdf
-        residuals = np.abs(arnoldi.h[-1, -1] * vectors[-1])
+        # Ensure residuals and approximate residuals match
 
-        np.testing.assert_allclose(r_residuals, residuals, rtol=RTOL, atol=ATOL)
+        # For a given ritz value/vector pair lambda_i / u_i, we have, in precise
+        # arithmetic:
+        #
+        #   ||A u_i - lambda_i u_i|| = h[k, k-1] * |<e_k, v_k>| where u_k = q * v_k
+        #
+        # In practice, they only approximately equal. The left hand side is the
+        # "true" residual, the right hand side the approximate one
+        for i in range(1, n_iter):
+            residuals = arnoldi._approximate_residuals(n_ev, i)
+            r_residuals = arnoldi._residuals(a, n_ev, i)
+            np.testing.assert_allclose(r_residuals, residuals, rtol=RTOL, atol=ATOL)
