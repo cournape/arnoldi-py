@@ -1,5 +1,4 @@
 import numpy as np
-import numpy.linalg as nlin
 import pytest
 import scipy.sparse as sp
 
