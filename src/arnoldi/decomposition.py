@@ -6,21 +6,19 @@ class Arnoldi:
     """ Create an arnoldi solver for operators of dimension n, with a Krylov
     basis of k dimensions.
     """
-    def __init__(self, n, k, dtype=np.complex128):
+    def __init__(self, n, k, dtype=np.complex128, atol=None):
         self.n = n
         self.k = k
 
         self.q = np.zeros((n, k+1), dtype=dtype)
         self.h = np.zeros((k+1, k), dtype=dtype)
 
+        # Logic of sqrt copied from Julia's ArnoldiMethod.jl package
+        self.atol = atol or np.sqrt(np.finfo(self._dtype).eps)
+
     @property
     def _dtype(self):
         return self.h.dtype
-
-    @property
-    def _atol(self):
-        # Logic of sqrt copied from Julia's ArnoldiMethod.jl package
-        return np.sqrt(np.finfo(self._dtype).eps)
 
     def initialize(self, init_vector=None):
         if init_vector is None:
@@ -29,8 +27,8 @@ class Arnoldi:
 
         self.q[:, 0] = init_vector
 
-    def iterate(self, a, tol=None):
-        tol = tol or self._atol
+    def iterate(self, a, atol=None):
+        atol = atol or self.atol
         for j in range(self.k):
             v = self.q[:, j+1]
             v[:] = a @ self.q[:, j]
@@ -42,7 +40,7 @@ class Arnoldi:
 
             self.h[j + 1, j] = np.linalg.norm(v)
 
-            if self.h[j + 1, j] < self._atol:
+            if self.h[j + 1, j] < self.atol:
                 return j
             v /= self.h[j + 1, j]
 
