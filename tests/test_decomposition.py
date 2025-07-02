@@ -1,9 +1,10 @@
 import numpy as np
+import numpy.linalg as nlin
 import pytest
 import scipy.sparse as sp
 
 from arnoldi import Arnoldi
-from arnoldi.decomposition import _largest_eigvals
+from arnoldi.decomposition import _largest_eigvals, RitzDecomposition
 
 
 ATOL = 1e-8
@@ -80,11 +81,11 @@ class TestArnoldiExpansion:
         arnoldi.initialize()
         n_iter = arnoldi.iterate(a)
 
-        ritz_values, _ = arnoldi._extract_ritz_decomp(n_ev, n_iter)
+        ritz = RitzDecomposition.from_arnoldi(arnoldi, n_ev)
 
         ## Then
         # Ensure estimated eigen values approximately match
-        np.testing.assert_allclose(r_eigvals, ritz_values, rtol=RTOL, atol=ATOL)
+        np.testing.assert_allclose(r_eigvals, ritz.values, rtol=RTOL, atol=ATOL)
 
     def test_residuals_computation(self):
         ## Given
@@ -113,6 +114,7 @@ class TestArnoldiExpansion:
         # In practice, they only approximately equal. The left hand side is the
         # "true" residual, the right hand side the approximate one
         for i in range(1, n_iter):
-            residuals = arnoldi._approximate_residuals(n_ev, i)
-            r_residuals = arnoldi._residuals(a, n_ev, i)
-            np.testing.assert_allclose(r_residuals, residuals, rtol=RTOL, atol=ATOL)
+            ritz = RitzDecomposition.from_arnoldi(arnoldi, n_ev, i)
+            r_residuals = nlin.norm(a @ ritz.vectors - ritz.values * ritz.vectors, axis=0)
+            np.testing.assert_allclose(r_residuals, ritz.approximate_residuals, rtol=RTOL, atol=ATOL)
+            np.testing.assert_allclose(r_residuals, ritz.compute_residuals(a))

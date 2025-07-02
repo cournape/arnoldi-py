@@ -1,9 +1,11 @@
+import dataclasses
+
 import numpy as np
 import numpy.linalg as nlin
 
 
 class Arnoldi:
-    """ Create an arnoldi solver for operators of dimension n, with a Krylov
+    """ Create an arnoldi decomposition for operators of dimension n, with a Krylov
     basis of k dimensions.
     """
     def __init__(self, n, k, dtype=np.complex128, atol=None):
@@ -57,30 +59,45 @@ class Arnoldi:
 
         return q_k, h_k
 
-    def _extract_ritz_decomp_and_raw_base(self, n_ritz, k=None):
-        k = k or self.k
-        q_k, h_k = self._extract_arnold_decomp(k)
+
+@dataclasses.dataclass
+class RitzDecomposition:
+    values: np.ndarray
+    vectors: np.ndarray
+
+    # The approximate residuals
+    approximate_residuals: np.ndarray
+
+    @classmethod
+    def from_arnoldi(cls, arnoldi, n_ritz, k=None):
+        # n_ritz is the number of ritz values to extract, k is the number of
+        # active dimension of the arnoldi decomposition.
+        k = k or arnoldi.k
+        q_k, h_k = arnoldi._extract_arnold_decomp(k)
 
         ritz_values, vectors = _largest_eigvals(h_k, n_ritz)
         ritz_vectors = q_k @ vectors
-        return ritz_values, ritz_vectors, vectors
 
-    def _extract_ritz_decomp(self, n_ritz, k=None):
-        """ Extract n_ritz ritz values / vectors."""
-        ritz_values, ritz_vectors, vectors = self._extract_ritz_decomp_and_raw_base(n_ritz, k)
-        return ritz_values, ritz_vectors
+        return cls(
+            ritz_values, ritz_vectors,
+            _approximate_residuals(arnoldi.h, vectors, k)
+        )
 
-    def _approximate_residuals(self, n_ritz, k=None):
-        _, _, v_k = self._extract_ritz_decomp_and_raw_base(n_ritz, k)
-        return _approximate_residuals(self.h, v_k, k)
+    def compute_residuals(self, a):
+        """ The "true" residuals of this ritz decomposition, i.e.
 
-    def _residuals(self, a, n_ritz, k=None):
-        ritz_values, ritz_vectors = self._extract_ritz_decomp(n_ritz, k)
-        return nlin.norm(a @ ritz_vectors - ritz_values * ritz_vectors, axis=0)
+            ||a @ v - lambda * v||
+
+        for the ritz vectors v and ritz values lambda
+        """
+        return nlin.norm(
+            a @ self.vectors - self.values * self.vectors, axis=0
+        )
 
 
 def _approximate_residuals(h, v_k, k):
-    # For a given eigen value/vector pair lambda_i / u_i, we have:
+    # Given a matrix A with arnoldi decomposition A * q = q * h_k + ...,
+    # for a given eigen value / vector pair lambda_i / u_i of h_k,
     #
     # ||A u_i - lambda_i u_i|| = h[k, k-1] * |<e_k, v_k>| where u_k = q * v_k
     #
