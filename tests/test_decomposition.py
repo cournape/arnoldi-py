@@ -3,7 +3,7 @@ import numpy.linalg as nlin
 import pytest
 import scipy.sparse as sp
 
-from arnoldi import Arnoldi
+from arnoldi import ArnoldiDecomposition
 from arnoldi.decomposition import _largest_eigvals, RitzDecomposition
 
 
@@ -35,7 +35,7 @@ class TestArnoldiExpansion:
         a += sp.diags_array(np.ones(n))
 
         ## When
-        arnoldi = Arnoldi(n, k)
+        arnoldi = ArnoldiDecomposition(n, k)
         arnoldi.initialize()
         n_iter = arnoldi.iterate(a)
 
@@ -77,7 +77,7 @@ class TestArnoldiExpansion:
         r_eigvals, _ = _largest_eigvals(a.toarray(), n_ev)
 
         ## When
-        arnoldi = Arnoldi(n, k)
+        arnoldi = ArnoldiDecomposition(n, k)
         arnoldi.initialize()
         n_iter = arnoldi.iterate(a)
 
@@ -99,7 +99,7 @@ class TestArnoldiExpansion:
         a += sp.diags_array(np.ones(n))
 
         ## When
-        arnoldi = Arnoldi(n, k)
+        arnoldi = ArnoldiDecomposition(n, k)
         arnoldi.initialize()
         n_iter = arnoldi.iterate(a)
 

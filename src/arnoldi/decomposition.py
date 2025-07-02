@@ -4,7 +4,7 @@ import numpy as np
 import numpy.linalg as nlin
 
 
-class Arnoldi:
+class ArnoldiDecomposition:
     """ Create an arnoldi decomposition for operators of dimension n, with a Krylov
     basis of k dimensions.
     """
