@@ -142,12 +142,34 @@ def min_distance(a, b):
     return m
 
 
+def fortran_d_format(x):
+    if x == 0:
+        return "0.000D+00"
+    else:
+        exponent = int(np.floor(np.log10(abs(x))))
+        mantissa = x / (10 ** exponent)
+        # Normalize mantissa to [0.1, 1.0)
+        mantissa /= 10
+        exponent += 1
+        return f"{mantissa:.3f}D{exponent:+03d}"
+
+
+def format_fortran_array(arr):
+    return np.array2string(
+        arr,
+        formatter={'float_kind': fortran_d_format}
+    )
+
+
+F = fortran_d_format
+
+
 if True:
     # Reproduce table 6.1 and 6.2 of NUMERICAL METHODS FOR LARGE
     # EIGENVALUE PROBLEMS, 2nd edition
     TOL = np.sqrt(np.finfo(np.float64).eps)
 
-    A = mark(200)
+    A = mark(10)
     print(A.shape)
     #A, _ = load_mhd1280b()
     N = A.shape[0]
@@ -155,18 +177,18 @@ if True:
     r_values = np.sort(sp.linalg.eigs(A, NEV)[0])[::-1]
     print(r_values)
 
-    #print("=============== Simple Arnoldi w/o restarts =============")
-    #for k in [5, 10, 15, 20, 25, 30]:
-    #    ritz_vals, ritz_vecs = arnoldi_simple(A, k)
-    #    print(f"residual @ k = {k}       {min_distance(ritz_vals[0], r_values[0]):.5e}")
+    print("=============== Simple Arnoldi w/o restarts =============")
+    for k in [5, 10, 15, 20, 25, 30]:
+        ritz_vals, ritz_vecs = arnoldi_simple(A, k)
+        print(f"residual @ k = {k}       {F(min_distance(ritz_vals[0], r_values[0]))}")
 
-    #print("=============== Simple Arnoldi w/ restarts =============")
-    #k = 5
-    #for max_restarts in [10 // k, 20 // k, 30 // k, 40 // k, 50 // k]:
-    #    ritz_vals, ritz_vecs, history, _ = arnoldi_with_naive_restart(A,
-    #                                                                  max_restarts,
-    #                                                                  k)
-    #    print(f"residual @ k = {k} / {max_restarts * k}   {min_distance(ritz_vals[0], r_values[0]):.5e}")
+    print("=============== Simple Arnoldi w/ restarts =============")
+    k = 5
+    for max_restarts in [10 // k, 20 // k, 30 // k, 40 // k, 50 // k]:
+        ritz_vals, ritz_vecs, history, _ = arnoldi_with_naive_restart(A,
+                                                                      max_restarts,
+                                                                      k)
+        print(f"residual @ k = {k} / {max_restarts * k} {F(min_distance(ritz_vals[0], r_values[0]))}")
 
     k = 20
     max_iters = 5000
