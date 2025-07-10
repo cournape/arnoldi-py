@@ -22,40 +22,40 @@ def basis_vector(n, k, dtype=np.int64):
 
 class TestArnoldiExpansion:
     def test_invariant_simple(self):
-        # Test the invariant A * Q ~ Q * H, with H Hessenberg matrix and Q
+        # Test the invariant A * V ~ V * H, with H Hessenberg matrix and V
         # orthonormal
 
         ## Given
         n = 10
-        k = 6
+        max_dim = 6
         dtype = np.complex128
-        e_k = basis_vector(k, k, dtype)
+        e_k = basis_vector(max_dim, max_dim, dtype)
 
         a = sp.random(n, n, density=5 / n, dtype=dtype)
         a += sp.diags_array(np.ones(n))
 
         ## When
-        arnoldi = ArnoldiDecomposition(n, k)
+        arnoldi = ArnoldiDecomposition(n, max_dim)
         arnoldi.initialize()
         n_iter = arnoldi.iterate(a)
 
-        q, h = arnoldi.q, arnoldi.h
-        q_k, h_k = arnoldi._extract_arnold_decomp(n_iter)
+        v, h = arnoldi.v, arnoldi.h
+        v_k, h_k = arnoldi._extract_arnold_decomp(n_iter)
 
         ## Then
-        # the arnoldi basis Q is orthonormal
+        # the arnoldi basis V is orthonormal
         np.testing.assert_allclose(
-            q.conj().T @ q, np.eye(n_iter + 1), rtol=RTOL, atol=ATOL
+            v.conj().T @ v, np.eye(n_iter + 1), rtol=RTOL, atol=ATOL
         )
         # the arnoldi decomposition invariants are respected
         np.testing.assert_allclose(
-            a @ q_k,
-            q_k @ h_k + h[-1, -1] * np.outer(q[:, -1], e_k),
+            a @ v_k,
+            v_k @ h_k + h[-1, -1] * np.outer(v[:, -1], e_k),
             rtol=RTOL,
             atol=ATOL,
         )
 
-        np.testing.assert_allclose(a @ q[:, :-1], q @ h, rtol=RTOL, atol=ATOL)
+        np.testing.assert_allclose(a @ v[:, :-1], v @ h, rtol=RTOL, atol=ATOL)
 
     @pytest.mark.flaky(reruns=3)
     def test_eigvals_simple(self):
@@ -79,7 +79,7 @@ class TestArnoldiExpansion:
         ## When
         arnoldi = ArnoldiDecomposition(n, k)
         arnoldi.initialize()
-        n_iter = arnoldi.iterate(a)
+        arnoldi.iterate(a)
 
         ritz = RitzDecomposition.from_arnoldi(arnoldi, n_ev)
 

@@ -6,14 +6,21 @@ import numpy.linalg as nlin
 
 class ArnoldiDecomposition:
     """ Create an arnoldi decomposition for operators of dimension n, with a Krylov
-    basis of k dimensions.
-    """
-    def __init__(self, n, k, dtype=np.complex128, atol=None):
-        self.n = n
-        self.k = k
+    basis of up to max_dim dimensions.
 
-        self.q = np.zeros((n, k+1), dtype=dtype)
-        self.h = np.zeros((k+1, k), dtype=dtype)
+    Parameters
+    ==========
+    n: int
+        The dimension of each 
+    max_dim: int
+        Max dimension of the underlying Krylov space.
+    """
+    def __init__(self, n, max_dim, dtype=np.complex128, atol=None):
+        self.n = n
+        self.max_dim = max_dim
+
+        self.v = np.zeros((n, max_dim+1), dtype=dtype)
+        self.h = np.zeros((max_dim+1, max_dim), dtype=dtype)
 
         # Logic of sqrt copied from Julia's ArnoldiMethod.jl package
         self.atol = atol or np.sqrt(np.finfo(self._dtype).eps)
@@ -27,18 +34,18 @@ class ArnoldiDecomposition:
             init_vector = np.random.randn(self.n).astype(self._dtype)
             init_vector /= np.linalg.norm(init_vector)
 
-        self.q[:, 0] = init_vector
+        self.v[:, 0] = init_vector
 
-    def iterate(self, a, atol=None):
+    def iterate(self, a, start_dim=0, atol=None):
         atol = atol or self.atol
-        for j in range(self.k):
-            v = self.q[:, j+1]
-            v[:] = a @ self.q[:, j]
+        for j in range(start_dim, self.max_dim):
+            v = self.v[:, j+1]
+            v[:] = a @ self.v[:, j]
 
             # Modified Gram-Schmidt (orthonormalization)
             for i in range(j + 1):
-                self.h[i, j] = np.vdot(self.q[:, i], v)
-                v -= self.h[i, j] * self.q[:, i]
+                self.h[i, j] = np.vdot(self.v[:, i], v)
+                v -= self.h[i, j] * self.v[:, i]
 
             self.h[j + 1, j] = np.linalg.norm(v)
 
@@ -46,18 +53,18 @@ class ArnoldiDecomposition:
                 return j
             v /= self.h[j + 1, j]
 
-        return self.k
+        return self.max_dim
 
-    def _extract_arnold_decomp(self, size=None):
-        """ Return Q_k/H_k such as Q_k^H A Q_k = H_k.
+    def _extract_arnold_decomp(self, k=None):
+        """ Return V_k/H_k such as V_k^H A V_k = V_k.
         """
-        q, h = self.q, self.h
-        size = size or self.k
+        v, h = self.v, self.h
+        k = k or self.max_dim
 
-        q_k = q[:, :size]
-        h_k = h[:size, :size]
+        v_k = v[:, :k]
+        h_k = h[:k, :k]
 
-        return q_k, h_k
+        return v_k, h_k
 
 
 @dataclasses.dataclass
@@ -69,18 +76,18 @@ class RitzDecomposition:
     approximate_residuals: np.ndarray
 
     @classmethod
-    def from_arnoldi(cls, arnoldi, n_ritz, k=None):
+    def from_arnoldi(cls, arnoldi, n_ritz, max_dim=None):
         # n_ritz is the number of ritz values to extract, k is the number of
         # active dimension of the arnoldi decomposition.
-        k = k or arnoldi.k
-        q_k, h_k = arnoldi._extract_arnold_decomp(k)
+        max_dim = max_dim or arnoldi.max_dim
+        v_k, h_k = arnoldi._extract_arnold_decomp(max_dim)
 
         ritz_values, vectors = _largest_eigvals(h_k, n_ritz)
-        ritz_vectors = q_k @ vectors
+        ritz_vectors = v_k @ vectors
 
         return cls(
             ritz_values, ritz_vectors,
-            _approximate_residuals(arnoldi.h, vectors, k)
+            _approximate_residuals(arnoldi.h, vectors, max_dim)
         )
 
     def compute_residuals(self, a):
@@ -96,7 +103,7 @@ class RitzDecomposition:
 
 
 def _approximate_residuals(h, v_k, k):
-    # Given a matrix A with arnoldi decomposition A * q = q * h_k + ...,
+    # Given a matrix A with arnoldi decomposition A * v = v * h_k + ...,
     # for a given eigen value / vector pair lambda_i / u_i of h_k,
     #
     # ||A u_i - lambda_i u_i|| = h[k, k-1] * |<e_k, v_k>| where u_k = q * v_k
