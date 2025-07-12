@@ -76,14 +76,16 @@ class RitzDecomposition:
     approximate_residuals: np.ndarray
 
     @classmethod
-    def from_arnoldi(cls, arnoldi, n_ritz, max_dim=None):
+    def from_arnoldi(cls, arnoldi, n_ritz, start_dim=0, max_dim=None):
         # n_ritz is the number of ritz values to extract, k is the number of
         # active dimension of the arnoldi decomposition.
         max_dim = max_dim or arnoldi.max_dim
         v_k, h_k = arnoldi._extract_arnold_decomp(max_dim)
+        v_active = v_k[:, start_dim:]
+        h_active = h_k[start_dim:, start_dim:]
 
-        ritz_values, vectors = _largest_eigvals(h_k, n_ritz)
-        ritz_vectors = v_k @ vectors
+        ritz_values, vectors = _largest_eigvals(h_active, n_ritz)
+        ritz_vectors = v_active @ vectors
 
         return cls(
             ritz_values, ritz_vectors,

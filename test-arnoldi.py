@@ -59,7 +59,7 @@ def arnoldi_simple(a, k=None):
 
     n_iter = arnoldi.iterate(a)
 
-    ritz = RitzDecomposition.from_arnoldi(arnoldi, nev, n_iter)
+    ritz = RitzDecomposition.from_arnoldi(arnoldi, nev, max_dim=n_iter)
     #residuals = ritz.compute_residuals(a)
     #approx_residuals = arnoldi._approximate_residuals(nev, n_iter)
 
@@ -96,9 +96,9 @@ def arnoldi_simple(a, k=None):
 # - implement block ERAM ?
 # - implement basic Krylov-Schur
 
-import line_profiler
-
-@line_profiler.profile
+#import line_profiler
+#
+#@line_profiler.profile
 def arnoldi_with_naive_restart(a, max_iters, k=None):
     n = a.shape[0]
     nev = 1 # Arnoldi w/ naive restart only really works for one eigen value
@@ -112,13 +112,13 @@ def arnoldi_with_naive_restart(a, max_iters, k=None):
 
     for i in range(max_iters + 1):
         if i > 0:
-            arnoldi.q.fill(0)
+            arnoldi.v.fill(0)
             arnoldi.h.fill(0)
         arnoldi.initialize(v)
 
         n_iter = arnoldi.iterate(a)
 
-        ritz = RitzDecomposition.from_arnoldi(arnoldi, nev, k=n_iter)
+        ritz = RitzDecomposition.from_arnoldi(arnoldi, nev, max_dim=n_iter)
         if np.abs(ritz.approximate_residuals[0]) < arnoldi.atol:
             break
 
@@ -128,6 +128,92 @@ def arnoldi_with_naive_restart(a, max_iters, k=None):
         residuals_history[i] = ritz.approximate_residuals
 
     return ritz.values, ritz.vectors, residuals_history, i
+
+
+def arnoldi_with_restarts_and_locking(a, nev, max_iters, k=None):
+    n = a.shape[0]
+    k = k or min(max(2 * nev + 1, 20), n)
+    active_dim = 0
+    arnoldi = ArnoldiDecomposition(n, k)
+
+    v = np.random.randn(n)
+    v /= slin.norm(v)
+    arnoldi.initialize(v)
+
+    residuals_history = {}
+    ritz_values = []
+
+    for restart in range(max_iters + 1):
+        arnoldi.h[:, active_dim:].fill(0)
+
+        n_iter = arnoldi.iterate(a, start_dim=active_dim)
+        #print(f"locked is [0, {active_dim}[, active is [{active_dim}, {n_iter}[")
+        if n_iter == active_dim:
+            print(f"Happy break down at restart {restart}, restarting from random")
+            # Locked space is already invariant, can't extract more values, so
+            # starting from a new random value
+            v = arnoldi.v
+
+            init_vector = random_vector(arnoldi.n, arnoldi._dtype, q=v[:,
+                                                                       :active_dim])
+        else:
+            ritz = RitzDecomposition.from_arnoldi(arnoldi, nev, max_dim=n_iter,
+                                                  start_dim=active_dim)
+            res = np.abs(ritz.approximate_residuals[0])
+            #res = np.abs(ritz.compute_residuals(a)[0])
+            if res < arnoldi.atol:
+                print(f"restart {restart}, ritz value {active_dim} converged, locking...")
+                v, h = arnoldi.v, arnoldi.h
+                ritz_values.append(ritz.values[0])
+
+                u = ritz.vectors[:, 0]
+                # Modified Gram-Schmidt (orthonormalization)
+                for i in range(active_dim):
+                    p = np.vdot(v[:, i], u)
+                    u -= p * v[:, i]
+                init_vector = u
+
+                u_next = a @ u
+                for i in range(active_dim):
+                    arnoldi.h[i, active_dim] = np.vdot(v[:, i], u_next)
+
+                active_dim += 1
+                if active_dim >= nev:
+                    break
+            else:
+                #print(f"No convergence, res is {res:.2g}")
+                #res = ritz.compute_residuals(a)
+                #for r in res:
+                #    print(f"Res are {np.abs(r):.2g}")
+                init_vector = ritz.vectors[:, 0]
+                init_vector /= slin.norm(init_vector)
+        arnoldi.v[:, active_dim] = init_vector
+        arnoldi.v[:, active_dim+1:].fill(0)
+
+        if restart % 50 == 0:
+            print(f"Running restart {restart}")
+            print(np.abs(ritz.approximate_residuals[0]))
+            print(np.abs(ritz.compute_residuals(a)[0]))
+            print(arnoldi.atol)
+
+    return np.array(ritz_values), ritz.vectors, residuals_history, restart
+
+
+def random_vector(n, dtype, q=None):
+    """ Create a new random unit vector of size n, given dtype. If Q given,
+    assumed to be an array n x k of k vectors that the vector should be
+    orthogonal against.
+    """
+    u = np.random.randn(n).astype(dtype=dtype)
+
+    if q is not None:
+        # Modified Gram-Schmidt (orthonormalization)
+        for i in range(q.shape[1]):
+            p = np.vdot(q[:, i], u)
+            u -= p * q[:, i]
+
+    u /= slin.norm(u)
+    return u
 
 
 def min_distance(a, b):
@@ -170,11 +256,15 @@ if True:
     TOL = np.sqrt(np.finfo(np.float64).eps)
 
     A = mark(10)
-    print(A.shape)
     #A, _ = load_mhd1280b()
+    #A, _ = load_suitesparse_from_name("matrices/af23560")
     N = A.shape[0]
+    NEV = 3
+    print(A.shape)
 
-    r_values = np.sort(sp.linalg.eigs(A, NEV)[0])[::-1]
+    vals = sp.linalg.eigs(A, NEV)[0]
+    ind = np.argsort(np.abs(vals))[::-1]
+    r_values = vals[ind]
     print(r_values)
 
     print("=============== Simple Arnoldi w/o restarts =============")
@@ -190,13 +280,17 @@ if True:
                                                                       k)
         print(f"residual @ k = {k} / {max_restarts * k} {F(min_distance(ritz_vals[0], r_values[0]))}")
 
+    print("=============== Simple Arnoldi w/ restarts + locking =============")
     k = 20
-    max_iters = 5000
-    ritz_vals, ritz_vecs, history, n_iter = arnoldi_with_naive_restart(A,
-                                                                       max_iters,
-                                                                       k)
+    max_iters = 500
+    ritz_vals, ritz_vecs, history, n_iter = arnoldi_with_restarts_and_locking(
+        A, NEV, max_iters, k)
+    print(ritz_vals)
+    if len(ritz_vals) < NEV:
+        print(f"!!! Only {len(ritz_vals)} value(s) converged """)
     print(f"Took {n_iter} iterations and ~{n_iter * k} mat vecs to converge")
-    print(f"residual        {min_distance(ritz_vals[0], r_values[0]):.5e}")
+    for i in range(len(ritz_vals)):
+        print(f"residual        {min_distance(ritz_vals[i], r_values[i]):.5e}")
 
 
 if False:
