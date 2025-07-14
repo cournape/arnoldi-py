@@ -144,9 +144,16 @@ def arnoldi_with_restarts_and_locking(a, nev, max_iters, k=None):
     ritz_values = []
 
     for restart in range(max_iters + 1):
+        # FIXME: likely not needed
         arnoldi.h[:, active_dim:].fill(0)
 
         n_iter = arnoldi.iterate(a, start_dim=active_dim)
+
+        if n_iter > active_dim:
+            basis = arnoldi.v[:, active_dim:n_iter]
+            dim = n_iter - active_dim
+            orthonorm_res = norm(basis.conj().T @ basis - np.eye(dim))
+            print(f"Orthonormal res is {orthonorm_res:.2g}")
         #print(f"locked is [0, {active_dim}[, active is [{active_dim}, {n_iter}[")
         if n_iter == active_dim:
             print(f"Happy break down at restart {restart}, restarting from random")
@@ -156,45 +163,44 @@ def arnoldi_with_restarts_and_locking(a, nev, max_iters, k=None):
 
             init_vector = random_vector(arnoldi.n, arnoldi._dtype, q=v[:,
                                                                        :active_dim])
+            v[:, active_dim] = init_vector
         else:
+            v, h = arnoldi.v, arnoldi.h
+            u = v[:, active_dim]
+
             ritz = RitzDecomposition.from_arnoldi(arnoldi, nev, max_dim=n_iter,
                                                   start_dim=active_dim)
-            res = np.abs(ritz.approximate_residuals[0])
-            #res = np.abs(ritz.compute_residuals(a)[0])
+
+            # FIXME: we should select the ritz vector that has the lowest
+            # residual, not the one associated w/ the "best" ritz value
+            u[:] = ritz.vectors[:, 0]
+            # Modified Gram-Schmidt (orthonormalization)
+            for i in range(active_dim):
+                p = np.vdot(v[:, i], u)
+                u -= p * v[:, i]
+            u /= norm(u)
+
+            #res = np.abs(ritz.approximate_residuals[0])
+            res = np.abs(ritz.compute_residuals(a)[0])
             if res < arnoldi.atol:
                 print(f"restart {restart}, ritz value {active_dim} converged, locking...")
-                v, h = arnoldi.v, arnoldi.h
                 ritz_values.append(ritz.values[0])
 
-                u = ritz.vectors[:, 0]
-                # Modified Gram-Schmidt (orthonormalization)
+                a_u = a @ u
                 for i in range(active_dim):
-                    p = np.vdot(v[:, i], u)
-                    u -= p * v[:, i]
-                init_vector = u
-
-                u_next = a @ u
-                for i in range(active_dim):
-                    arnoldi.h[i, active_dim] = np.vdot(v[:, i], u_next)
+                    arnoldi.h[i, active_dim] = np.vdot(v[:, i], a_u)
 
                 active_dim += 1
                 if active_dim >= nev:
                     break
-            else:
-                #print(f"No convergence, res is {res:.2g}")
-                #res = ritz.compute_residuals(a)
-                #for r in res:
-                #    print(f"Res are {np.abs(r):.2g}")
-                init_vector = ritz.vectors[:, 0]
-                init_vector /= slin.norm(init_vector)
-        arnoldi.v[:, active_dim] = init_vector
+        # FIXME: likely not needed
         arnoldi.v[:, active_dim+1:].fill(0)
 
         if restart % 50 == 0:
             print(f"Running restart {restart}")
-            print(np.abs(ritz.approximate_residuals[0]))
-            print(np.abs(ritz.compute_residuals(a)[0]))
-            print(arnoldi.atol)
+            #print(np.abs(ritz.approximate_residuals[0]))
+            #print(np.abs(ritz.compute_residuals(a)[0]))
+            #print(arnoldi.atol)
 
     return np.array(ritz_values), ritz.vectors, residuals_history, restart
 
@@ -281,7 +287,7 @@ if True:
         print(f"residual @ k = {k} / {max_restarts * k} {F(min_distance(ritz_vals[0], r_values[0]))}")
 
     print("=============== Simple Arnoldi w/ restarts + locking =============")
-    k = 20
+    k = 10
     max_iters = 500
     ritz_vals, ritz_vecs, history, n_iter = arnoldi_with_restarts_and_locking(
         A, NEV, max_iters, k)
