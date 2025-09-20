@@ -1,6 +1,8 @@
 import numpy as np
 import numpy.linalg as nlin
 
+from .utils import rand_normalized_vector
+
 
 norm = nlin.norm
 
@@ -26,10 +28,7 @@ class Arnoldi:
         return np.sqrt(np.finfo(self._dtype).eps)
 
     def initialize(self, init_vector=None):
-        if init_vector is None:
-            init_vector = np.random.randn(self.n).astype(self._dtype)
-            init_vector /= np.linalg.norm(init_vector)
-
+        init_vector = init_vector or rand_normalized_vector(self.n, self._dtype)
         self.V[:, 0] = init_vector
 
     def iterate(self, A):
@@ -86,7 +85,7 @@ def arnoldi_decomp(A, V, H, invariant_tol, max_dim=None):
 
     Parameters
     ----------
-    A : ndarray of shap (n, n)
+    A : ndarray of shape (n, n)
         square matrix to be decomposed
     V : ndarray of shape (n, m+1)
         the krylov basisexpected built by the Arnoldi decomposition
@@ -98,6 +97,15 @@ def arnoldi_decomp(A, V, H, invariant_tol, max_dim=None):
         decomposition has a norm below that threshold.
     max_dim : int
         Max dimension of the Krylov space. By default, guessed from V.shape
+
+    Returns
+    -------
+    Va : ndarray of shape (n, max_dim+1)
+    Ha : ndarray of shape (max_dim+1, max_dim)
+    n_iter : int
+        <= max_dim. The number of iterations actually run. Is lower than
+        max_dim in case a "lucky break" is found, i.e. the Krylov basis
+        invariant is lower dimension than max_dim
     """
     n = A.shape[0]
     m = V.shape[1] - 1
@@ -124,4 +132,4 @@ def arnoldi_decomp(A, V, H, invariant_tol, max_dim=None):
             raise ValueError("Lucky break not supported yet")
         v /= H[j + 1, j]
 
-    return V, H, m
+    return V[:, :max_dim+1], H[:max_dim+1, :max_dim], max_dim
