@@ -43,7 +43,7 @@ class Arnoldi:
             self.h[j + 1, j] = np.linalg.norm(v)
 
             if self.h[j + 1, j] < self._atol:
-                return j
+                raise ValueError("Lucky break not supported yet")
             v /= self.h[j + 1, j]
 
         return self.k
