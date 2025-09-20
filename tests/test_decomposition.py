@@ -20,6 +20,41 @@ def basis_vector(n, k, dtype=np.int64):
     return ret
 
 
+def assert_invariants(A, V, H, m):
+    """Raise an assertion error if Arnoldi decomposition invariants are not
+    respected.
+
+    The key Arnoldi invariant are
+    1. V should be orthonormal
+    2. A * V_m ~ V_m * H_m + h_{m+1,m} v_{m+1}
+    3. V_m` * A * V_m ~ H_m, with H_m Hessenberg matrix
+
+    Reference
+    ---------
+    See eqs. 6.8 and 6.9 of Numerical Methods for Large Eigenvalue
+    Problems, 2nd edition.
+    """
+    e_m = basis_vector(m, m, V.dtype)
+
+    V_m = V[:, :m]
+    H_m = H[:m, :m]
+
+    # the arnoldi basis V is orthonormal
+    np.testing.assert_allclose(
+        V.conj().T @ V, np.eye(m + 1), rtol=RTOL, atol=ATOL
+    )
+
+    # the arnoldi decomposition invariants are respected
+    np.testing.assert_allclose(
+        A @ V_m,
+        V_m @ H_m + H[-1, -1] * np.outer(V[:, -1], e_m),
+        rtol=RTOL,
+        atol=ATOL,
+    )
+
+    np.testing.assert_allclose(V_m.conj().T @ A @ V_m, H_m, rtol=RTOL, atol=ATOL)
+
+
 class TestArnoldiExpansion:
     def test_invariant_simple(self):
         # Test the invariant A * V ~ V * H, with H Hessenberg matrix and V
@@ -29,7 +64,6 @@ class TestArnoldiExpansion:
         n = 10
         m = 6
         dtype = np.complex128
-        e_k = basis_vector(m, m, dtype)
 
         A = sp.random(n, n, density=5 / n, dtype=dtype)
         A += sp.diags_array(np.ones(n))
@@ -40,22 +74,10 @@ class TestArnoldiExpansion:
         n_iter = arnoldi.iterate(A)
 
         V, H = arnoldi.V, arnoldi.H
-        V_m, H_m = arnoldi._extract_arnold_decomp(n_iter)
 
         ## Then
-        # the arnoldi basis V is orthonormal
-        np.testing.assert_allclose(
-            V.conj().T @ V, np.eye(n_iter + 1), rtol=RTOL, atol=ATOL
-        )
-        # the arnoldi decomposition invariants are respected
-        np.testing.assert_allclose(
-            A @ V_m,
-            V_m @ H_m + H[-1, -1] * np.outer(V[:, -1], e_k),
-            rtol=RTOL,
-            atol=ATOL,
-        )
-
-        np.testing.assert_allclose(A @ V[:, :-1], V @ H, rtol=RTOL, atol=ATOL)
+        # the arnoldi invariants are respected
+        assert_invariants(A, V, H, n_iter)
 
     @pytest.mark.flaky(reruns=3)
     def test_eigvals_simple(self):
@@ -120,33 +142,6 @@ class TestArnoldiExpansion:
 
 
 class TestArnoldiDecomposition:
-    def assert_invariants(self, A, V, H, m):
-        """Raise an assertion error if Arnoldi decomposition invariants are not
-        respected.
-
-        The key Arnoldi invariant is A * V ~ V * H, with H Hessenberg matrix
-        and V orthonormal.
-        """
-        e_m = basis_vector(m, m, V.dtype)
-
-        V_m = V[:, :m]
-        H_m = H[:m, :m]
-
-        # the arnoldi basis V is orthonormal
-        np.testing.assert_allclose(
-            V.conj().T @ V, np.eye(m + 1), rtol=RTOL, atol=ATOL
-        )
-
-        # the arnoldi decomposition invariants are respected
-        np.testing.assert_allclose(
-            A @ V_m,
-            V_m @ H_m + H[-1, -1] * np.outer(V[:, -1], e_m),
-            rtol=RTOL,
-            atol=ATOL,
-        )
-
-        np.testing.assert_allclose(A @ V[:, :-1], V @ H, rtol=RTOL, atol=ATOL)
-
     def test_invariant_simple(self):
         ## Given
         n = 10
@@ -165,7 +160,7 @@ class TestArnoldiDecomposition:
         Va, Ha, n_iter = arnoldi_decomp(A, V, H, ATOL)
 
         ## Then
-        self.assert_invariants(A, Va, Ha, n_iter)
+        assert_invariants(A, Va, Ha, n_iter)
 
     def test_max_dim_support(self):
         ## Given
@@ -186,4 +181,4 @@ class TestArnoldiDecomposition:
         Va, Ha, n_iter = arnoldi_decomp(A, V, H, ATOL, max_dim)
 
         ## Then
-        self.assert_invariants(A, Va, Ha, n_iter)
+        assert_invariants(A, Va, Ha, n_iter)
