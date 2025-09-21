@@ -7,7 +7,7 @@ from .utils import rand_normalized_vector
 norm = nlin.norm
 
 
-class Arnoldi:
+class ArnoldiDecomposition:
     """ Create an arnoldi solver for operators of dimension n, with a Krylov
     basis of up to m dimensions.
     """
@@ -32,7 +32,7 @@ class Arnoldi:
         self.V[:, 0] = init_vector
 
     def iterate(self, A):
-        _, _, m = arnoldi_decomp(A, self.V, self.H, self._atol, self.m)
+        _, _, m = arnoldi_decomposition(A, self.V, self.H, self._atol, self.m)
         return m
 
     def _extract_arnoldi_decomp(self, m=None):
@@ -75,7 +75,7 @@ def _largest_eigvals(H, n_ev):
     return eigvals[ind], eigvecs[:, ind]
 
 
-def arnoldi_decomp(A, V, H, invariant_tol, max_dim=None):
+def arnoldi_decomposition(A, V, H, invariant_tol, max_dim=None):
     """Run the arnoldi decomposition for square matrix a of dimension n.
 
     Parameters

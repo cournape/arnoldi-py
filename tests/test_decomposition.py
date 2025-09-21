@@ -2,8 +2,8 @@ import numpy as np
 import pytest
 import scipy.sparse as sp
 
-from arnoldi import Arnoldi
-from arnoldi.decomposition import _largest_eigvals, arnoldi_decomp
+from arnoldi import ArnoldiDecomposition
+from arnoldi.decomposition import _largest_eigvals, arnoldi_decomposition
 from arnoldi.utils import rand_normalized_vector
 
 
@@ -55,7 +55,7 @@ def assert_invariants(A, V, H, m):
     np.testing.assert_allclose(V_m.conj().T @ A @ V_m, H_m, rtol=RTOL, atol=ATOL)
 
 
-class TestArnoldiExpansion:
+class TestArnoldiDecomposition:
     def test_invariant_simple(self):
         # Test the invariant A * V ~ V * H, with H Hessenberg matrix and V
         # orthonormal
@@ -69,7 +69,7 @@ class TestArnoldiExpansion:
         A += sp.diags_array(np.ones(n))
 
         ## When
-        arnoldi = Arnoldi(n, m)
+        arnoldi = ArnoldiDecomposition(n, m)
         arnoldi.initialize()
         n_iter = arnoldi.iterate(A)
 
@@ -99,7 +99,7 @@ class TestArnoldiExpansion:
         r_eigvals, _ = _largest_eigvals(A.toarray(), n_ev)
 
         ## When
-        arnoldi = Arnoldi(n, m)
+        arnoldi = ArnoldiDecomposition(n, m)
         arnoldi.initialize()
         n_iter = arnoldi.iterate(A)
 
@@ -121,7 +121,7 @@ class TestArnoldiExpansion:
         A += sp.diags_array(np.ones(n))
 
         ## When
-        arnoldi = Arnoldi(n, m)
+        arnoldi = ArnoldiDecomposition(n, m)
         arnoldi.initialize()
         n_iter = arnoldi.iterate(A)
 
@@ -141,7 +141,7 @@ class TestArnoldiExpansion:
             np.testing.assert_allclose(r_residuals, residuals, rtol=RTOL, atol=ATOL)
 
 
-class TestArnoldiDecomposition:
+class TestArnoldiDecompositionFunction:
     def test_invariant_simple(self):
         ## Given
         n = 10
@@ -157,7 +157,7 @@ class TestArnoldiDecomposition:
         V[:, 0] = rand_normalized_vector(n, dtype)
 
         ## When
-        Va, Ha, n_iter = arnoldi_decomp(A, V, H, ATOL)
+        Va, Ha, n_iter = arnoldi_decomposition(A, V, H, ATOL)
 
         ## Then
         assert_invariants(A, Va, Ha, n_iter)
@@ -178,7 +178,7 @@ class TestArnoldiDecomposition:
         V[:, 0] = rand_normalized_vector(n, dtype)
 
         ## When
-        Va, Ha, n_iter = arnoldi_decomp(A, V, H, ATOL, max_dim)
+        Va, Ha, n_iter = arnoldi_decomposition(A, V, H, ATOL, max_dim)
 
         ## Then
         assert_invariants(A, Va, Ha, n_iter)
