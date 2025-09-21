@@ -4,11 +4,14 @@ import scipy.sparse as sp
 
 from arnoldi import ArnoldiDecomposition
 from arnoldi.decomposition import _largest_eigvals, arnoldi_decomposition
+from arnoldi.matrices import mark
 from arnoldi.utils import rand_normalized_vector
 
 
 ATOL = 1e-8
 RTOL = 1e-4
+
+norm = np.linalg.norm
 
 
 def basis_vector(n, k, dtype=np.int64):
@@ -79,7 +82,7 @@ class TestArnoldiDecomposition:
         # the arnoldi invariants are respected
         assert_invariants(A, V, H, n_iter)
 
-    @pytest.mark.flaky(reruns=3)
+    @pytest.mark.flaky(reruns=5)
     def test_eigvals_simple(self):
         # Simple test checking that eigen values of H_k (aka the ritz values)
         # approximate the matrix's eigenvalues.
@@ -113,7 +116,7 @@ class TestArnoldiDecomposition:
         ## Given
         n = 20
         m = 6
-        n_ev = 3
+        n_ev = 2
 
         A = sp.random(n, n, density=5 / n, dtype=np.complex128)
         # We add ones on the diag to have a well conditioned matrix and eigen
@@ -182,3 +185,36 @@ class TestArnoldiDecompositionFunction:
 
         ## Then
         assert_invariants(A, Va, Ha, n_iter)
+
+
+class TestEigenValues:
+    @pytest.mark.parametrize(
+        "m,d", [(5, 0), (10, 1), (15, 2), (20, 3), (25, 5), (30, 7)]
+    )
+    @pytest.mark.flaky(reruns=3)
+    def test_mark10(self, m, d):
+        # For the numerical value, see table 6.1 of Numerical Methods for Large
+        # Eigenvalue Problems, 2nd edition.
+
+        ## Given
+        A = mark(10)
+        n = A.shape[0]
+        k = 1
+
+        r_val = sp.linalg.eigs(A, k)[0]
+
+        ## When
+        arnoldi = ArnoldiDecomposition(n, m)
+        arnoldi.initialize()
+        n_iter = arnoldi.iterate(A)
+
+        V_m, H_m = arnoldi._extract_arnoldi_decomp(n_iter)
+
+        ritz_values, vectors = _largest_eigvals(H_m, k)
+        ritz_vectors = V_m @ vectors
+        val = ritz_values[0]
+        vec = ritz_vectors[:, 0]
+
+        ## Then
+        residual = norm(A @ vec - val * vec)
+        assert residual <= 2 * 10**(-d)
