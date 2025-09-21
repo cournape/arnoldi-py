@@ -38,20 +38,15 @@ class Arnoldi:
     def _extract_arnold_decomp(self, m=None):
         """ Return V_m/H_m such as V_m^H A V_m = H_m.
         """
-        Q, H = self.V, self.H
         m = m or self.m
-
-        q_m = Q[:, :m]
-        h_m = H[:m, :m]
-
-        return q_m, h_m
+        return self.V[:, :m], self.H[:m, :m]
 
     def _extract_ritz_decomp_and_raw_base(self, n_ritz, m=None):
         m = m or self.m
-        Q_m, H_m = self._extract_arnold_decomp(m)
+        V_m, H_m = self._extract_arnold_decomp(m)
 
         ritz_values, vectors = _largest_eigvals(H_m, n_ritz)
-        ritz_vectors = Q_m @ vectors
+        ritz_vectors = V_m @ vectors
         return ritz_values, ritz_vectors, vectors
 
     def _extract_ritz_decomp(self, n_ritz, m=None):
