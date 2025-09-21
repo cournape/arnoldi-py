@@ -3,7 +3,7 @@ import pytest
 import scipy.sparse as sp
 
 from arnoldi import ArnoldiDecomposition
-from arnoldi.decomposition import _largest_eigvals, arnoldi_decomposition
+from arnoldi.decomposition import RitzDecomposition, arnoldi_decomposition
 from arnoldi.matrices import mark
 from arnoldi.utils import rand_normalized_vector
 
@@ -99,18 +99,19 @@ class TestArnoldiDecomposition:
         # values not too far from 1
         A += sp.diags_array(np.ones(n))
 
-        r_eigvals, _ = _largest_eigvals(A.toarray(), n_ev)
+        r_values = sp.linalg.eigs(A, n_ev)[0]
 
         ## When
         arnoldi = ArnoldiDecomposition(n, m)
         arnoldi.initialize()
         n_iter = arnoldi.iterate(A)
 
-        ritz_values, _ = arnoldi._extract_ritz_decomp(n_ev, n_iter)
+        ritz = RitzDecomposition.from_v_and_h(arnoldi.V, arnoldi.H, n_iter)
 
         ## Then
         # Ensure estimated eigen values approximately match
-        np.testing.assert_allclose(r_eigvals, ritz_values, rtol=RTOL, atol=ATOL)
+        np.testing.assert_allclose(r_values, ritz.values[:n_ev], rtol=RTOL,
+                                   atol=ATOL)
 
     def test_residuals_computation(self):
         ## Given
@@ -128,20 +129,15 @@ class TestArnoldiDecomposition:
         arnoldi.initialize()
         n_iter = arnoldi.iterate(A)
 
+        ritz = RitzDecomposition.from_v_and_h(arnoldi.V, arnoldi.H, n_ev,
+                                              max_dim=n_iter)
+
         ## Then
         # Ensure residuals and approximate residuals match
+        r_residuals = norm(A @ ritz.vectors - ritz.values * ritz.vectors, axis=0)
 
-        # For a given ritz value/vector pair lambda_i / u_i, we have, in precise
-        # arithmetic:
-        #
-        #   ||A u_i - lambda_i u_i|| = h[k, k-1] * |<e_k, v_k>| where u_k = q * v_k
-        #
-        # In practice, they only approximately equal. The left hand side is the
-        # "true" residual, the right hand side the approximate one
-        for i in range(1, n_iter):
-            residuals = arnoldi._approximate_residuals(n_ev, i)
-            r_residuals = arnoldi._residuals(A, n_ev, i)
-            np.testing.assert_allclose(r_residuals, residuals, rtol=RTOL, atol=ATOL)
+        residuals = ritz.approximate_residuals
+        np.testing.assert_allclose(r_residuals, residuals, rtol=RTOL, atol=ATOL)
 
 
 class TestArnoldiDecompositionFunction:
@@ -208,12 +204,10 @@ class TestEigenValues:
         arnoldi.initialize()
         n_iter = arnoldi.iterate(A)
 
-        V_m, H_m = arnoldi._extract_arnoldi_decomp(n_iter)
+        ritz = RitzDecomposition.from_v_and_h(arnoldi.V, arnoldi.H, n_iter)
 
-        ritz_values, vectors = _largest_eigvals(H_m, k)
-        ritz_vectors = V_m @ vectors
-        val = ritz_values[0]
-        vec = ritz_vectors[:, 0]
+        val = ritz.values[0]
+        vec = ritz.vectors[:, 0]
 
         ## Then
         residual = norm(A @ vec - val * vec)

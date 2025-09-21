@@ -1,3 +1,5 @@
+import dataclasses
+
 import numpy as np
 import numpy.linalg as nlin
 
@@ -34,39 +36,6 @@ class ArnoldiDecomposition:
     def iterate(self, A):
         _, _, m = arnoldi_decomposition(A, self.V, self.H, self._atol, self.m)
         return m
-
-    def _extract_arnoldi_decomp(self, m=None):
-        """ Return V_m/H_m such as V_m^H A V_m = H_m.
-        """
-        m = m or self.m
-        return self.V[:, :m], self.H[:m, :m]
-
-    def _extract_ritz_decomp_and_raw_base(self, n_ritz, m=None):
-        m = m or self.m
-        V_m, H_m = self._extract_arnoldi_decomp(m)
-
-        ritz_values, vectors = _largest_eigvals(H_m, n_ritz)
-        ritz_vectors = V_m @ vectors
-        return ritz_values, ritz_vectors, vectors
-
-    def _extract_ritz_decomp(self, n_ritz, m=None):
-        """ Extract n_ritz ritz values / vectors."""
-        ritz_values, ritz_vectors, vectors = self._extract_ritz_decomp_and_raw_base(n_ritz, m)
-        return ritz_values, ritz_vectors
-
-    def _approximate_residuals(self, n_ritz, m):
-        # For a given eigen value/vector pair lambda_i / u_i, we have:
-        #
-        # ||A u_i - lambda_i u_i|| = h[k, k-1] * |<e_k, v_k>| where u_k = q * v_k
-        #
-        # See e.g. proposition 6.8 of
-        # https://www-users.cse.umn.edu/~saad/eig_book_2ndEd.pdf
-        _, _, V_m = self._extract_ritz_decomp_and_raw_base(n_ritz, m)
-        return np.abs(self.H[m, m-1] * V_m[-1])
-
-    def _residuals(self, A, n_ritz, m=None):
-        ritz_values, ritz_vectors = self._extract_ritz_decomp(n_ritz, m)
-        return nlin.norm(A @ ritz_vectors - ritz_values * ritz_vectors, axis=0)
 
 
 def _largest_eigvals(H, n_ev):
@@ -128,3 +97,74 @@ def arnoldi_decomposition(A, V, H, invariant_tol, max_dim=None):
         v /= H[j + 1, j]
 
     return V[:, :max_dim+1], H[:max_dim+1, :max_dim], max_dim
+
+
+@dataclasses.dataclass
+class RitzDecomposition:
+    values: np.ndarray
+    vectors: np.ndarray
+
+    # The approximate residuals
+    approximate_residuals: np.ndarray
+
+    @classmethod
+    def from_v_and_h(cls, V, H, n_ritz, *, max_dim=None):
+        """
+        Compute the ritz decomposition for the Arnoldi decomposition V and H. Assumes
+        A * V[:, :m] = V[:, :m] * H[:m, :m] + H[m, m-1] * (V[:, m] * e_m^H)
+
+        Parameters
+        ----------
+        V : ndarray of shape (n, max_dim+1)
+            The orthonormal basis of the matrix from Arnoldi
+        H : ndarray of shape (max_dim+1, max_dim)
+            The upper Hessenberg matrix decomposed from Arnoldi
+        n_ritz : int
+            The number of ritz values/vectors to extract
+        max_dim : int, optional
+            If given, the number of vectors to consider in V. If not given,
+            assumed to be the number of V's columns
+        """
+        # For a given ritz value/vector pair lambda_i / u_i, we have
+        #
+        #   ||A u_i - lambda_i u_i|| = h[m, m-1] * |<e_m, s_i^m>|
+        #
+        # where u_i = V_m * s_i^m is ritz vector for ritz value lambda_i and
+        # e_m the m^th vector basis, in other words <e_m, s_i^m> is the last
+        # component of s_i
+        #
+        # In practice, this is may not hold for complex cases, which is why we
+        # keep the right hand side in the attribute approximate_residuals
+        max_dim = max_dim or V.shape[1] - 1
+
+        assert H.shape[0] > max_dim
+        assert H.shape[1] >= max_dim
+        assert V.shape[1] > max_dim
+        assert n_ritz <= max_dim
+
+        V_m = V[:, :max_dim]
+        H_m = H[:max_dim, :max_dim]
+
+        ritz_values, S = _largest_eigvals(H_m, n_ritz)
+        ritz_vectors = V_m @ S
+
+        approximate_residuals = np.abs(H[max_dim, max_dim-1] * S[-1])
+        return cls(
+            ritz_values,
+            ritz_vectors,
+            approximate_residuals,
+        )
+
+    def compute_true_residuals(self, A):
+        """The "true" residuals of this ritz decomposition, i.e.
+
+            res[i] = ||A @ v_i - lambda_i * v_i||
+
+        for the ritz vector v_i and ritz value lambda_i
+
+        Notes
+        -----
+        This is expensive as it requires projection back into the original
+        matrix A
+        """
+        return norm(A @ self.vectors - self.values * self.vectors, axis=0)
