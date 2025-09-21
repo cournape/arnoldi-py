@@ -204,7 +204,7 @@ class TestEigenValues:
         arnoldi.initialize()
         n_iter = arnoldi.iterate(A)
 
-        ritz = RitzDecomposition.from_v_and_h(arnoldi.V, arnoldi.H, n_iter)
+        ritz = RitzDecomposition.from_v_and_h(arnoldi.V, arnoldi.H, k)
 
         val = ritz.values[0]
         vec = ritz.vectors[:, 0]
@@ -212,3 +212,24 @@ class TestEigenValues:
         ## Then
         residual = norm(A @ vec - val * vec)
         assert residual <= 2 * 10**(-d)
+
+
+class TestRitzDecomposition:
+    def test_simple(self):
+        ## Given
+        A = mark(10)
+        n = A.shape[0]
+        m = 20
+        k = 1
+
+        arnoldi = ArnoldiDecomposition(n, m)
+        arnoldi.initialize()
+        arnoldi.iterate(A)
+
+        r_val = sp.linalg.eigs(A, k)[0]
+
+        ## When
+        ritz = RitzDecomposition.from_v_and_h(arnoldi.V, arnoldi.H, k)
+
+        ## Then
+        np.testing.assert_allclose(ritz.values[0], r_val, rtol=RTOL, atol=ATOL)
