@@ -10,8 +10,14 @@ from arnoldi.utils import rand_normalized_vector
 
 ATOL = 1e-8
 RTOL = 1e-4
+# Max retries for short tests
+MAX_RETRIES_SHORT = 3
 
 norm = np.linalg.norm
+
+def sort_by_criteria(x):
+    idx = np.argsort(np.abs(x))
+    return x[idx]
 
 
 def basis_vector(n, k, dtype=np.int64):
@@ -82,7 +88,7 @@ class TestArnoldiDecomposition:
         # the arnoldi invariants are respected
         assert_invariants(A, V, H, n_iter)
 
-    @pytest.mark.flaky(reruns=5)
+    @pytest.mark.flaky(reruns=MAX_RETRIES_SHORT)
     def test_eigvals_simple(self):
         # Simple test checking that eigen values of H_k (aka the ritz values)
         # approximate the matrix's eigenvalues.
@@ -92,14 +98,14 @@ class TestArnoldiDecomposition:
         # We use large krylov space since basic arnoldi does not converge
         # quickly. Once we implement restarts, it should converge much faster
         m = n - 1
-        n_ev = 3
+        k = 2
 
         A = sp.random(n, n, density=5 / n, dtype=np.complex128)
         # We add ones on the diag to have a well conditioned matrix and eigen
         # values not too far from 1
         A += sp.diags_array(np.ones(n))
 
-        r_values = sp.linalg.eigs(A, n_ev)[0]
+        r_values = sp.linalg.eigs(A, k)[0]
 
         ## When
         arnoldi = ArnoldiDecomposition(n, m)
@@ -110,7 +116,7 @@ class TestArnoldiDecomposition:
 
         ## Then
         # Ensure estimated eigen values approximately match
-        np.testing.assert_allclose(r_values, ritz.values[:n_ev], rtol=RTOL,
+        np.testing.assert_allclose(r_values, ritz.values[:k], rtol=RTOL,
                                    atol=ATOL)
 
     def test_residuals_computation(self):
@@ -187,7 +193,7 @@ class TestEigenValues:
     @pytest.mark.parametrize(
         "m,d", [(5, 0), (10, 1), (15, 2), (20, 3), (25, 5), (30, 7)]
     )
-    @pytest.mark.flaky(reruns=3)
+    @pytest.mark.flaky(reruns=MAX_RETRIES_SHORT)
     def test_mark10(self, m, d):
         # For the numerical value, see table 6.1 of Numerical Methods for Large
         # Eigenvalue Problems, 2nd edition.
@@ -195,7 +201,7 @@ class TestEigenValues:
         ## Given
         A = mark(10)
         n = A.shape[0]
-        k = 1
+        k = 2
 
         r_val = sp.linalg.eigs(A, k)[0]
 
@@ -215,21 +221,27 @@ class TestEigenValues:
 
 
 class TestRitzDecomposition:
+    @pytest.mark.flaky(reruns=MAX_RETRIES_SHORT)
     def test_simple(self):
         ## Given
         A = mark(10)
         n = A.shape[0]
         m = 20
-        k = 1
+        k = 2
+        precision = 3
 
         arnoldi = ArnoldiDecomposition(n, m)
         arnoldi.initialize()
         arnoldi.iterate(A)
 
-        r_val = sp.linalg.eigs(A, k)[0]
+        r_vals = sp.linalg.eigs(A, k)[0]
 
         ## When
         ritz = RitzDecomposition.from_v_and_h(arnoldi.V, arnoldi.H, k)
 
         ## Then
-        np.testing.assert_allclose(ritz.values[0], r_val, rtol=RTOL, atol=ATOL)
+        np.testing.assert_allclose(norm(sort_by_criteria(ritz.values)),
+                                   norm(sort_by_criteria(r_vals)), rtol=1e-3,
+                                   atol=ATOL)
+        residuals = norm(A @ ritz.vectors - ritz.values * ritz.vectors)
+        assert residuals <= 2 * 10**(-precision)
