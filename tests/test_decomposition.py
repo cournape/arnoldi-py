@@ -203,12 +203,12 @@ class TestEigenValues:
         n = A.shape[0]
         k = 2
 
-        r_val = sp.linalg.eigs(A, k)[0]
+        sp.linalg.eigs(A, k)[0]
 
         ## When
         arnoldi = ArnoldiDecomposition(n, m)
         arnoldi.initialize()
-        n_iter = arnoldi.iterate(A)
+        arnoldi.iterate(A)
 
         ritz = RitzDecomposition.from_v_and_h(arnoldi.V, arnoldi.H, k)
 
