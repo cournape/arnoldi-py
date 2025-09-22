@@ -20,6 +20,10 @@ def sort_by_criteria(x):
     return x[idx]
 
 
+def inject_noise(A):
+    A[:] = np.random.randn(*A.shape)
+
+
 def basis_vector(n, k, dtype=np.int64):
     """Create the basis vector e_k in R^n, aka e_k is (n,), and with e_k[k] =
     1
@@ -267,3 +271,34 @@ class TestRitzDecomposition:
                                    residuals, rtol=RTOL, atol=ATOL)
         np.testing.assert_allclose(ritz.approximate_residuals, residuals,
                                    rtol=RTOL, atol=ATOL)
+
+    def test_max_dim(self):
+        # Ensure max_dim is correctly implemented in RitzDecomposition
+        ## Given
+        A = mark(10)
+        n = A.shape[0]
+        m = 20
+        k = 2
+        max_dim = m - 5
+
+        ## When
+        arnoldi = ArnoldiDecomposition(n, m)
+        arnoldi.initialize()
+        arnoldi.iterate(A)
+        V, H = arnoldi.V, arnoldi.H
+
+        inject_noise(V[:, max_dim:])
+        inject_noise(H[max_dim+1:,max_dim:])
+
+        broken_ritz = RitzDecomposition.from_v_and_h(V, H, k)
+        ritz = RitzDecomposition.from_v_and_h(V, H, k, max_dim=max_dim)
+
+        ## Then
+        with pytest.raises(AssertionError):
+            np.testing.assert_allclose(broken_ritz.compute_true_residuals(A),
+                                       broken_ritz.approximate_residuals,
+                                       rtol=RTOL, atol=ATOL)
+
+        np.testing.assert_allclose(ritz.compute_true_residuals(A),
+                                   ritz.approximate_residuals, rtol=RTOL,
+                                   atol=ATOL)
