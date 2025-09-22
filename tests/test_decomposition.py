@@ -186,6 +186,8 @@ class TestArnoldiDecompositionFunction:
         Va, Ha, n_iter = arnoldi_decomposition(A, V, H, ATOL, max_dim)
 
         ## Then
+        assert Va.shape == (n, max_dim+1)
+        assert Ha.shape == (max_dim+1, max_dim)
         assert_invariants(A, Va, Ha, n_iter)
 
 
