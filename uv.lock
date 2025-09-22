@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.11"
 resolution-markers = [
     "sys_platform != 'darwin'",
@@ -74,6 +74,9 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "notebook" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "pytest-rerunfailures" },
 ]
 test = [
     { name = "pytest" },
@@ -89,7 +92,12 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "notebook", specifier = ">=7.4.2" }]
+dev = [
+    { name = "notebook", specifier = ">=7.4.2" },
+    { name = "pytest", specifier = ">=8.3.5" },
+    { name = "pytest-cov", specifier = ">=6.2.1" },
+    { name = "pytest-rerunfailures", specifier = ">=15.1" },
+]
 test = [
     { name = "pytest", specifier = ">=8.3.5" },
     { name = "pytest-cov", specifier = ">=6.2.1" },

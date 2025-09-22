@@ -1,21 +1,28 @@
+import dataclasses
+
 import numpy as np
 import numpy.linalg as nlin
 
+from .utils import rand_normalized_vector
 
-class Arnoldi:
+
+norm = nlin.norm
+
+
+class ArnoldiDecomposition:
     """ Create an arnoldi solver for operators of dimension n, with a Krylov
-    basis of k dimensions.
+    basis of up to m dimensions.
     """
-    def __init__(self, n, k, dtype=np.complex128):
+    def __init__(self, n, m, dtype=np.complex128):
         self.n = n
-        self.k = k
+        self.m = m
 
-        self.q = np.zeros((n, k+1), dtype=dtype)
-        self.h = np.zeros((k+1, k), dtype=dtype)
+        self.V = np.zeros((n, m+1), dtype=dtype)
+        self.H = np.zeros((m+1, m), dtype=dtype)
 
     @property
     def _dtype(self):
-        return self.h.dtype
+        return self.H.dtype
 
     @property
     def _atol(self):
@@ -23,71 +30,141 @@ class Arnoldi:
         return np.sqrt(np.finfo(self._dtype).eps)
 
     def initialize(self, init_vector=None):
-        if init_vector is None:
-            init_vector = np.random.randn(self.n).astype(self._dtype)
-            init_vector /= np.linalg.norm(init_vector)
+        init_vector = init_vector or rand_normalized_vector(self.n, self._dtype)
+        self.V[:, 0] = init_vector
 
-        self.q[:, 0] = init_vector
-
-    def iterate(self, a, tol=None):
-        tol = tol or self._atol
-        for j in range(self.k):
-            v = self.q[:, j+1]
-            v[:] = a @ self.q[:, j]
-
-            # Modified Gram-Schmidt (orthonormalization)
-            for i in range(j + 1):
-                self.h[i, j] = np.vdot(self.q[:, i], v)
-                v -= self.h[i, j] * self.q[:, i]
-
-            self.h[j + 1, j] = np.linalg.norm(v)
-
-            if self.h[j + 1, j] < self._atol:
-                return j
-            v /= self.h[j + 1, j]
-
-        return self.k
-
-    def _extract_arnold_decomp(self, size=None):
-        """ Return Q_k/H_k such as Q_k^H A Q_k = H_k.
-        """
-        q, h = self.q, self.h
-        size = size or self.k
-
-        q_k = q[:, :size]
-        h_k = h[:size, :size]
-
-        return q_k, h_k
-
-    def _extract_ritz_decomp_and_raw_base(self, n_ritz, k=None):
-        k = k or self.k
-        q_k, h_k = self._extract_arnold_decomp(k)
-
-        ritz_values, vectors = _largest_eigvals(h_k, n_ritz)
-        ritz_vectors = q_k @ vectors
-        return ritz_values, ritz_vectors, vectors
-
-    def _extract_ritz_decomp(self, n_ritz, k=None):
-        """ Extract n_ritz ritz values / vectors."""
-        ritz_values, ritz_vectors, vectors = self._extract_ritz_decomp_and_raw_base(n_ritz, k)
-        return ritz_values, ritz_vectors
-
-    def _approximate_residuals(self, n_ritz, k=None):
-        # For a given eigen value/vector pair lambda_i / u_i, we have:
-        #
-        # ||A u_i - lambda_i u_i|| = h[k, k-1] * |<e_k, v_k>| where u_k = q * v_k
-        #
-        # See e.g. proposition 6.8 of
-        # https://www-users.cse.umn.edu/~saad/eig_book_2ndEd.pdf
-        _, _, v_k = self._extract_ritz_decomp_and_raw_base(n_ritz, k)
-        return np.abs(self.h[k, k-1] * v_k[-1])
-
-    def _residuals(self, a, n_ritz, k=None):
-        ritz_values, ritz_vectors = self._extract_ritz_decomp(n_ritz, k)
-        return nlin.norm(a @ ritz_vectors - ritz_values * ritz_vectors, axis=0)
+    def iterate(self, A):
+        _, _, m = arnoldi_decomposition(A, self.V, self.H, self._atol, self.m)
+        return m
 
 
-def _largest_eigvals(h, n_ev):
-    eigvals, eigvecs = nlin.eig(h)
+def _largest_eigvals(H, n_ev):
+    eigvals, eigvecs = nlin.eig(H)
     ind = np.argsort(np.abs(eigvals))[:-n_ev-1:-1]
     return eigvals[ind], eigvecs[:, ind]
+
+
+def arnoldi_decomposition(A, V, H, invariant_tol, max_dim=None):
+    """Run the arnoldi decomposition for square matrix a of dimension n.
+
+    Parameters
+    ----------
+    A : ndarray of shape (n, n)
+        square matrix to be decomposed
+    V : ndarray of shape (n, m+1)
+        the krylov basis built by the Arnoldi decomposition
+    H : ndarray of shape (m+1, m)
+        H[:m, :m] is the Hessenberg matrix built by the Arnoldi decomposition
+    invariant_tol: float
+        threshold that contols when the decomposition will detect the Arnoldi
+        decomposition detected an invariant, i.e. when a new vector in Arnoldi
+        decomposition has a norm below that threshold.
+    max_dim : int
+        Max dimension of the Krylov space. By default, guessed from V.shape
+
+    Returns
+    -------
+    Va : ndarray of shape (n, max_dim+1)
+    Ha : ndarray of shape (max_dim+1, max_dim)
+    n_iter : int
+        <= max_dim. The number of iterations actually run. Is lower than
+        max_dim in case a "lucky break" is found, i.e. the Krylov basis
+        invariant is lower dimension than max_dim
+    """
+    n = A.shape[0]
+    m = V.shape[1] - 1
+
+    assert A.shape[1] == n, "A is expected to be square matrix"
+    assert V.shape == (n, m+1), "V must have the same number of rows as A"
+    assert H.shape == (m+1, m), f"H must be {m+1, m}, is {H.shape}"
+
+    max_dim = max_dim or m
+    assert max_dim <= m, "max_dim > m violated"
+
+    for j in range(max_dim):
+        v = V[:, j+1]
+        v[:] = A @ V[:, j]
+
+        # Modified Gram-Schmidt (orthonormalization)
+        for i in range(j + 1):
+            H[i, j] = np.vdot(V[:, i], v)
+            v -= H[i, j] * V[:, i]
+
+        H[j + 1, j] = norm(v)
+
+        if H[j + 1, j] < invariant_tol:
+            raise ValueError("Lucky break not supported yet")
+        v /= H[j + 1, j]
+
+    return V[:, :max_dim+1], H[:max_dim+1, :max_dim], max_dim
+
+
+@dataclasses.dataclass
+class RitzDecomposition:
+    values: np.ndarray
+    vectors: np.ndarray
+
+    # The approximate residuals
+    approximate_residuals: np.ndarray
+
+    @classmethod
+    def from_v_and_h(cls, V, H, n_ritz, *, max_dim=None):
+        """
+        Compute the ritz decomposition for the Arnoldi decomposition V and H. Assumes
+        A * V[:, :m] = V[:, :m] * H[:m, :m] + H[m, m-1] * (V[:, m] * e_m^H)
+
+        Parameters
+        ----------
+        V : ndarray of shape (n, max_dim+1)
+            The orthonormal basis of the matrix from Arnoldi
+        H : ndarray of shape (max_dim+1, max_dim)
+            The upper Hessenberg matrix decomposed from Arnoldi
+        n_ritz : int
+            The number of ritz values/vectors to extract
+        max_dim : int, optional
+            If given, the number of vectors to consider in V. If not given,
+            assumed to be the number of V's columns
+        """
+        # For a given ritz value/vector pair lambda_i / u_i, we have
+        #
+        #   ||A u_i - lambda_i u_i|| = h[m, m-1] * |<e_m, s_i^m>|
+        #
+        # where u_i = V_m * s_i^m is ritz vector for ritz value lambda_i and
+        # e_m the m^th vector basis, in other words <e_m, s_i^m> is the last
+        # component of s_i
+        #
+        # In practice, this is may not hold for complex cases, which is why we
+        # keep the right hand side in the attribute approximate_residuals
+        max_dim = max_dim or V.shape[1] - 1
+
+        assert H.shape[0] > max_dim
+        assert H.shape[1] >= max_dim
+        assert V.shape[1] > max_dim
+        assert n_ritz <= max_dim
+
+        V_m = V[:, :max_dim]
+        H_m = H[:max_dim, :max_dim]
+
+        ritz_values, S = _largest_eigvals(H_m, n_ritz)
+        ritz_vectors = V_m @ S
+
+        approximate_residuals = np.abs(H[max_dim, max_dim-1] * S[-1])
+        return cls(
+            ritz_values,
+            ritz_vectors,
+            approximate_residuals,
+        )
+
+    def compute_true_residuals(self, A):
+        """The "true" residuals of this ritz decomposition, i.e.
+
+            res[i] = ||A @ v_i - lambda_i * v_i||
+
+        for the ritz vector v_i and ritz value lambda_i
+
+        Notes
+        -----
+        This is expensive as it requires projection back into the original
+        matrix A
+        """
+        return norm(A @ self.vectors - self.values * self.vectors, axis=0)
