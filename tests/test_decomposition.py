@@ -4,7 +4,7 @@ import scipy.sparse as sp
 
 from arnoldi import ArnoldiDecomposition
 from arnoldi.decomposition import RitzDecomposition, arnoldi_decomposition
-from arnoldi.matrices import mark
+from arnoldi.matrices import mark, laplace
 from arnoldi.utils import rand_normalized_vector
 
 
@@ -221,23 +221,26 @@ class TestEigenValues:
 
 
 class TestRitzDecomposition:
-    @pytest.mark.flaky(reruns=MAX_RETRIES_SHORT)
-    def test_simple(self):
-        ## Given
-        A = mark(10)
+    def compute_ritz(self, A, m, k):
         n = A.shape[0]
-        m = 20
-        k = 2
-        precision = 3
-
         arnoldi = ArnoldiDecomposition(n, m)
         arnoldi.initialize()
         arnoldi.iterate(A)
 
+        return RitzDecomposition.from_v_and_h(arnoldi.V, arnoldi.H, k)
+
+    @pytest.mark.flaky(reruns=MAX_RETRIES_SHORT)
+    def test_simple(self):
+        ## Given
+        A = mark(10)
+        m = 20
+        k = 2
+        precision = 3
+
         r_vals = sp.linalg.eigs(A, k)[0]
 
         ## When
-        ritz = RitzDecomposition.from_v_and_h(arnoldi.V, arnoldi.H, k)
+        ritz = self.compute_ritz(A, m, k)
 
         ## Then
         np.testing.assert_allclose(norm(sort_by_criteria(ritz.values)),
@@ -245,3 +248,20 @@ class TestRitzDecomposition:
                                    atol=ATOL)
         residuals = norm(A @ ritz.vectors - ritz.values * ritz.vectors)
         assert residuals <= 2 * 10**(-precision)
+
+    @pytest.mark.parametrize(
+        "A,m", [(mark(10), 20), (laplace(100), 10)]
+    )
+    def test_residual_computation(self, A, m):
+        ## Given
+        k = 2
+
+        ## When
+        ritz = self.compute_ritz(A, m, k)
+
+        ## Then
+        residuals = norm(A @ ritz.vectors - ritz.values * ritz.vectors, axis=0)
+        np.testing.assert_allclose(ritz.compute_true_residuals(A),
+                                   residuals, rtol=RTOL, atol=ATOL)
+        np.testing.assert_allclose(ritz.approximate_residuals, residuals,
+                                   rtol=RTOL, atol=ATOL)
