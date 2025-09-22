@@ -187,7 +187,7 @@ class TestArnoldiDecompositionFunction:
         V[:, 0] = rand_normalized_vector(n, dtype)
 
         ## When
-        Va, Ha, n_iter = arnoldi_decomposition(A, V, H, ATOL, max_dim)
+        Va, Ha, n_iter = arnoldi_decomposition(A, V, H, ATOL, max_dim=max_dim)
 
         ## Then
         assert Va.shape == (n, max_dim+1)

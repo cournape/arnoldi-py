@@ -34,7 +34,7 @@ class ArnoldiDecomposition:
         self.V[:, 0] = init_vector
 
     def iterate(self, A):
-        _, _, m = arnoldi_decomposition(A, self.V, self.H, self._atol, self.m)
+        _, _, m = arnoldi_decomposition(A, self.V, self.H, self._atol)
         return m
 
 
@@ -44,7 +44,7 @@ def _largest_eigvals(H, n_ev):
     return eigvals[ind], eigvecs[:, ind]
 
 
-def arnoldi_decomposition(A, V, H, invariant_tol, max_dim=None):
+def arnoldi_decomposition(A, V, H, invariant_tol=None, *, max_dim=None):
     """Run the arnoldi decomposition for square matrix a of dimension n.
 
     Parameters
@@ -71,6 +71,9 @@ def arnoldi_decomposition(A, V, H, invariant_tol, max_dim=None):
         max_dim in case a "lucky break" is found, i.e. the Krylov basis
         invariant is lower dimension than max_dim
     """
+    # Logic of sqrt copied from Julia's ArnoldiMethod.jl package
+    invariant_tol = invariant_tol or np.sqrt(np.finfo(A.dtype).eps)
+
     n = A.shape[0]
     m = V.shape[1] - 1
 
