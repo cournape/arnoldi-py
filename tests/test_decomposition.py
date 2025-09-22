@@ -209,8 +209,6 @@ class TestEigenValues:
         n = A.shape[0]
         k = 2
 
-        sp.linalg.eigs(A, k)[0]
-
         ## When
         arnoldi = ArnoldiDecomposition(n, m)
         arnoldi.initialize()

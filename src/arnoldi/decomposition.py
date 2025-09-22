@@ -52,7 +52,7 @@ def arnoldi_decomposition(A, V, H, invariant_tol, max_dim=None):
     A : ndarray of shape (n, n)
         square matrix to be decomposed
     V : ndarray of shape (n, m+1)
-        the krylov basisexpected built by the Arnoldi decomposition
+        the krylov basis built by the Arnoldi decomposition
     H : ndarray of shape (m+1, m)
         H[:m, :m] is the Hessenberg matrix built by the Arnoldi decomposition
     invariant_tol: float
@@ -75,7 +75,7 @@ def arnoldi_decomposition(A, V, H, invariant_tol, max_dim=None):
     m = V.shape[1] - 1
 
     assert A.shape[1] == n, "A is expected to be square matrix"
-    assert V.shape == (n, m+1), "V must has same number of rows as V"
+    assert V.shape == (n, m+1), "V must have the same number of rows as A"
     assert H.shape == (m+1, m), f"H must be {m+1, m}, is {H.shape}"
 
     max_dim = max_dim or m
