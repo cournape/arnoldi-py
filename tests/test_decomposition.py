@@ -7,11 +7,12 @@ from arnoldi.decomposition import RitzDecomposition, arnoldi_decomposition
 from arnoldi.matrices import mark, laplace
 from arnoldi.utils import rand_normalized_vector
 
+from .common import MAX_RETRIES_SHORT
+
+
 
 ATOL = 1e-8
 RTOL = 1e-4
-# Max retries for short tests
-MAX_RETRIES_SHORT = 3
 
 norm = np.linalg.norm
 
@@ -193,6 +194,32 @@ class TestArnoldiDecompositionFunction:
         assert Va.shape == (n, max_dim+1)
         assert Ha.shape == (max_dim+1, max_dim)
         assert_invariants(A, Va, Ha, n_iter)
+
+    def test_converge_first_iteration(self):
+        ## Given
+        n = 10
+        m = 6
+        dtype = np.complex128
+
+        A = sp.random(n, n, density=5 / n, dtype=dtype)
+        A += sp.diags_array(np.ones(n))
+
+        ## When
+        # the Arnoldi decomposition is initialized with an eigenvector
+        _, r_vecs = sp.linalg.eigs(A)
+
+        V = np.zeros((n, m+1), dtype=dtype)
+        H = np.zeros((m+1, m), dtype=dtype)
+        V[:, 0] = r_vecs[:, 0]
+
+        Vm, Hm, n_iter = arnoldi_decomposition(A, V, H, ATOL)
+
+        ## Then
+        # Only one iteration is expected
+        assert n_iter == 1
+        assert Vm.shape == (n, n_iter+1)
+        assert Hm.shape == (n_iter+1, 1)
+        assert_invariants(A, Vm, Hm, n_iter)
 
 
 class TestEigenValues:
