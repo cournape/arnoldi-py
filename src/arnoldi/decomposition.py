@@ -35,6 +35,8 @@ class ArnoldiDecomposition:
 
     def iterate(self, A):
         _, _, m = arnoldi_decomposition(A, self.V, self.H, self._atol)
+        if m != self.m:
+            raise ValueError("Lucky break not supported yet")
         return m
 
 
@@ -98,7 +100,8 @@ def arnoldi_decomposition(A, V, H, invariant_tol=None, *, max_dim=None):
         H[j + 1, j] = norm(v)
 
         if H[j + 1, j] < invariant_tol:
-            raise ValueError("Lucky break not supported yet")
+            max_dim = j + 1
+            return V[:, :max_dim+1], H[:max_dim+1, :max_dim], max_dim
         v /= H[j + 1, j]
 
     return V[:, :max_dim+1], H[:max_dim+1, :max_dim], max_dim
