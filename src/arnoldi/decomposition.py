@@ -81,7 +81,9 @@ def arnoldi_decomposition(A, V, H, invariant_tol=None, *, max_dim=None):
     assert V.shape == (n, m+1), "V must have the same number of rows as A"
     assert H.shape == (m+1, m), f"H must be {m+1, m}, is {H.shape}"
 
-    max_dim = max_dim or m
+    if max_dim is None:
+        max_dim = m
+
     assert max_dim <= m, "max_dim > m violated"
 
     for j in range(max_dim):
