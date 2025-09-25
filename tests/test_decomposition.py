@@ -172,6 +172,60 @@ class TestArnoldiDecompositionFunction:
         ## Then
         assert_invariants(A, Va, Ha, n_iter)
 
+    def test_stop_restart_mid_point(self):
+        # Ensure stopping mid point and restarting keeps the decomposition
+        # invariants
+
+        ## Given
+        n = 10
+        m = 6
+        mid_point = 3
+        dtype = np.complex128
+
+        A = sp.random(n, n, density=5 / n, dtype=dtype)
+        A += sp.diags_array(np.ones(n))
+
+        V = np.zeros((n, m+1), dtype=dtype)
+        H = np.zeros((m+1, m), dtype=dtype)
+
+        V[:, 0] = rand_normalized_vector(n, dtype)
+
+        ## When
+        Va, Ha, n_iter = arnoldi_decomposition(A, V, H, ATOL, max_dim=mid_point)
+
+        ## Then
+        assert n_iter == mid_point
+        assert Va.shape == (n, mid_point+1)
+        assert Ha.shape == (mid_point+1, mid_point)
+        assert_invariants(A, Va, Ha, n_iter)
+
+        ## When
+        Va, Ha, n_iter = arnoldi_decomposition(A, V, H, ATOL, start_dim=mid_point)
+
+        ## Then
+        assert n_iter == m
+        assert Va.shape == (n, m+1)
+        assert Ha.shape == (m+1, m)
+        assert_invariants(A, Va, Ha, n_iter)
+
+        ## When
+        # Filling H/V with sentinel values
+        V[:, :mid_point] = 42
+        H[:, :mid_point] = 42
+
+        Va, Ha, n_iter = arnoldi_decomposition(A, V, H, ATOL, start_dim=mid_point)
+
+        ## Then
+        assert n_iter == m
+        assert Va.shape == (n, m+1)
+        assert Ha.shape == (m+1, m)
+        # Ensure initial columns are untouched
+        np.testing.assert_array_almost_equal(V[:, 0], 42)
+        np.testing.assert_array_almost_equal(H[:, 0], 42)
+        # Invariants should fail in this case
+        with pytest.raises(AssertionError):
+            assert_invariants(A, Va, Ha, n_iter)
+
     def test_max_dim_support(self):
         ## Given
         n = 10
