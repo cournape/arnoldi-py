@@ -172,6 +172,60 @@ class TestArnoldiDecompositionFunction:
         ## Then
         assert_invariants(A, Va, Ha, n_iter)
 
+    def test_stop_restart_mid_point(self):
+        # Ensure stopping mid point and restarting keeps the decomposition
+        # invariants
+
+        ## Given
+        n = 10
+        m = 6
+        mid_point = 3
+        dtype = np.complex128
+
+        A = sp.random(n, n, density=5 / n, dtype=dtype)
+        A += sp.diags_array(np.ones(n))
+
+        V = np.zeros((n, m+1), dtype=dtype)
+        H = np.zeros((m+1, m), dtype=dtype)
+
+        V[:, 0] = rand_normalized_vector(n, dtype)
+
+        ## When
+        Va, Ha, n_iter = arnoldi_decomposition(A, V, H, ATOL, max_dim=mid_point)
+
+        ## Then
+        assert n_iter == mid_point
+        assert Va.shape == (n, mid_point+1)
+        assert Ha.shape == (mid_point+1, mid_point)
+        assert_invariants(A, Va, Ha, n_iter)
+
+        ## When
+        Va, Ha, n_iter = arnoldi_decomposition(A, V, H, ATOL, start_dim=mid_point)
+
+        ## Then
+        assert n_iter == m
+        assert Va.shape == (n, m+1)
+        assert Ha.shape == (m+1, m)
+        assert_invariants(A, Va, Ha, n_iter)
+
+        ## When
+        # Filling H/V with sentinel values
+        V[:, :mid_point] = 42
+        H[:, :mid_point] = 42
+
+        Va, Ha, n_iter = arnoldi_decomposition(A, V, H, ATOL, start_dim=mid_point)
+
+        ## Then
+        assert n_iter == m
+        assert Va.shape == (n, m+1)
+        assert Ha.shape == (m+1, m)
+        # Ensure initial columns are untouched
+        np.testing.assert_array_almost_equal(V[:, 0], 42)
+        np.testing.assert_array_almost_equal(H[:, 0], 42)
+        # Invariants should fail in this case
+        with pytest.raises(AssertionError):
+            assert_invariants(A, Va, Ha, n_iter)
+
     def test_max_dim_support(self):
         ## Given
         n = 10
@@ -220,6 +274,46 @@ class TestArnoldiDecompositionFunction:
         assert Vm.shape == (n, n_iter+1)
         assert Hm.shape == (n_iter+1, 1)
         assert_invariants(A, Vm, Hm, n_iter)
+
+    def test_start_dim_invariant(self):
+        # Ensure starting from k-1 eigenpairs works with start_dim to find
+        # approximation of k-th eigenvalue.
+
+        ## Given
+        n = 10
+        m = n-1
+        k = 2
+        dtype = np.complex128
+
+        A = sp.random(n, n, density=5 / n, dtype=dtype)
+        A += sp.diags_array(np.ones(n))
+        r_vals, r_vecs = sp.linalg.eigs(A, k)
+
+        ## When
+        # the Arnoldi decomposition is initialized with k-1 eigenvector
+        V = np.zeros((n, m+1), dtype=dtype)
+        H = np.zeros((m+1, m), dtype=dtype)
+
+        V[:, :k-1] = r_vecs[:, :k-1]
+        for i in range(k-1):
+            H[i, i] = r_vals[i]
+        V[:, k-1] = rand_normalized_vector(n, dtype)
+
+        # Orthonormalize
+        V[:, :k], _ = np.linalg.qr(V[:, :k], mode="reduced")
+        V_init = V[:, :k].copy()
+        H_init = H[:, :k-1].copy()
+
+        Va, Ha, n_iter = arnoldi_decomposition(A, V, H, ATOL, start_dim=k-1)
+
+        ## Then
+        assert Va.shape == (n, n_iter+1)
+        assert Ha.shape == (n_iter+1, n_iter)
+        assert_invariants(A, Va, Ha, n_iter)
+
+        # Ensure initialized arrays are not modified
+        np.testing.assert_equal(Va[:, :k], V_init)
+        np.testing.assert_equal(Ha[:, :k-1], H_init)
 
 
 class TestEigenValues:
