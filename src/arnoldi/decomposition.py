@@ -34,7 +34,9 @@ class ArnoldiDecomposition:
         self.V[:, 0] = init_vector
 
     def iterate(self, A):
-        _, _, m = arnoldi_decomposition(A, self.V, self.H, self._atol, self.m)
+        _, _, m = arnoldi_decomposition(A, self.V, self.H, self._atol)
+        if m != self.m:
+            raise ValueError("Lucky break not supported yet")
         return m
 
 
@@ -44,7 +46,7 @@ def _largest_eigvals(H, n_ev):
     return eigvals[ind], eigvecs[:, ind]
 
 
-def arnoldi_decomposition(A, V, H, invariant_tol, max_dim=None):
+def arnoldi_decomposition(A, V, H, invariant_tol=None, *, max_dim=None):
     """Run the arnoldi decomposition for square matrix a of dimension n.
 
     Parameters
@@ -71,6 +73,9 @@ def arnoldi_decomposition(A, V, H, invariant_tol, max_dim=None):
         max_dim in case a "lucky break" is found, i.e. the Krylov basis
         invariant is lower dimension than max_dim
     """
+    # Logic of sqrt copied from Julia's ArnoldiMethod.jl package
+    invariant_tol = invariant_tol or np.sqrt(np.finfo(A.dtype).eps)
+
     n = A.shape[0]
     m = V.shape[1] - 1
 
@@ -78,7 +83,9 @@ def arnoldi_decomposition(A, V, H, invariant_tol, max_dim=None):
     assert V.shape == (n, m+1), "V must have the same number of rows as A"
     assert H.shape == (m+1, m), f"H must be {m+1, m}, is {H.shape}"
 
-    max_dim = max_dim or m
+    if max_dim is None:
+        max_dim = m
+
     assert max_dim <= m, "max_dim > m violated"
 
     for j in range(max_dim):
@@ -93,7 +100,8 @@ def arnoldi_decomposition(A, V, H, invariant_tol, max_dim=None):
         H[j + 1, j] = norm(v)
 
         if H[j + 1, j] < invariant_tol:
-            raise ValueError("Lucky break not supported yet")
+            max_dim = j + 1
+            return V[:, :max_dim+1], H[:max_dim+1, :max_dim], max_dim
         v /= H[j + 1, j]
 
     return V[:, :max_dim+1], H[:max_dim+1, :max_dim], max_dim
