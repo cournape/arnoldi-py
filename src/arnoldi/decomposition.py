@@ -74,7 +74,8 @@ def arnoldi_decomposition(A, V, H, invariant_tol=None, *, start_dim=0, max_dim=N
         invariant is lower dimension than max_dim
     """
     # Logic of sqrt copied from Julia's ArnoldiMethod.jl package
-    invariant_tol = invariant_tol or np.sqrt(np.finfo(A.dtype).eps)
+    if invariant_tol is None:
+        invariant_tol = np.sqrt(np.finfo(A.dtype).eps)
 
     n = A.shape[0]
     m = V.shape[1] - 1
