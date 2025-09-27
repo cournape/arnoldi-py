@@ -30,7 +30,8 @@ class ArnoldiDecomposition:
         return np.sqrt(np.finfo(self._dtype).eps)
 
     def initialize(self, init_vector=None):
-        init_vector = init_vector or rand_normalized_vector(self.n, self._dtype)
+        if init_vector is None:
+            init_vector = rand_normalized_vector(self.n, self._dtype)
         self.V[:, 0] = init_vector
 
     def iterate(self, A):
@@ -74,7 +75,8 @@ def arnoldi_decomposition(A, V, H, invariant_tol=None, *, max_dim=None):
         invariant is lower dimension than max_dim
     """
     # Logic of sqrt copied from Julia's ArnoldiMethod.jl package
-    invariant_tol = invariant_tol or np.sqrt(np.finfo(A.dtype).eps)
+    if invariant_tol is None:
+        invariant_tol = np.sqrt(np.finfo(A.dtype).eps)
 
     n = A.shape[0]
     m = V.shape[1] - 1
