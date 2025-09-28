@@ -91,20 +91,20 @@ def arnoldi_decomposition(A, V, H, invariant_tol=None, *, max_dim=None):
     assert max_dim <= m, "max_dim > m violated"
 
     for j in range(max_dim):
-        v = V[:, j+1]
-        v[:] = A @ V[:, j]
+        w = V[:, j+1]
+        w[:] = A @ V[:, j]
 
         # Modified Gram-Schmidt (orthonormalization)
         for i in range(j + 1):
-            H[i, j] = np.vdot(V[:, i], v)
-            v -= H[i, j] * V[:, i]
+            H[i, j] = np.vdot(V[:, i], w)
+            w -= H[i, j] * V[:, i]
 
-        H[j + 1, j] = norm(v)
+        H[j + 1, j] = norm(w)
 
         if H[j + 1, j] < invariant_tol:
             max_dim = j + 1
             return V[:, :max_dim+1], H[:max_dim+1, :max_dim], max_dim
-        v /= H[j + 1, j]
+        w /= H[j + 1, j]
 
     return V[:, :max_dim+1], H[:max_dim+1, :max_dim], max_dim
 
