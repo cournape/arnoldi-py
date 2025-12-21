@@ -6,12 +6,18 @@ from .utils import rand_normalized_vector
 
 
 def naive_explicit_restarts(A, m=None, *, stopping_criterion=None, max_restarts=10):
-    tol = stopping_criterion or np.sqrt(np.finfo(A.dtype).eps)
+    if stopping_criterion is None:
+        tol = np.sqrt(np.finfo(A.dtype).eps)
+    else:
+        tol = stopping_criterion
+
     dtype = np.promote_types(A.dtype, np.complex64)
 
     n = A.shape[0]
     k = 1  # Naive arnoldi w/o restart only really works for 1 eigenvalue
-    m = m or min(max(2 * k + 1, 20), n)
+
+    if m is None:
+        m = min(max(2 * k + 1, 20), n)
 
     V = np.zeros((n, m+1), dtype)
     H = np.zeros((m+1, m), dtype)
