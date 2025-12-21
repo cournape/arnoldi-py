@@ -94,10 +94,17 @@ def arnoldi_decomposition(A, V, H, invariant_tol=None, *, max_dim=None):
         w = V[:, j+1]
         w[:] = A @ V[:, j]
 
-        # Modified Gram-Schmidt (orthonormalization)
+        # Modified Gram-Schmidt (MGS) for orthonormalization
         for i in range(j + 1):
             H[i, j] = np.vdot(V[:, i], w)
             w -= H[i, j] * V[:, i]
+
+        # Double reorthonormalization with GMS
+        # FIXME: use DGKS criterion to avoid unneeded double reortho
+        for i in range(j + 1):
+            coeff = np.vdot(V[:, i], w)
+            H[i, j] += coeff
+            w -= coeff * V[:, i]
 
         H[j + 1, j] = norm(w)
 
