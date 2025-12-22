@@ -47,7 +47,7 @@ def _largest_eigvals(H, n_ev):
     return eigvals[ind], eigvecs[:, ind]
 
 
-def arnoldi_decomposition(A, V, H, invariant_tol=None, *, max_dim=None):
+def arnoldi_decomposition(A, V, H, invariant_tol=None, *, start_dim=0, max_dim=None):
     """Run the arnoldi decomposition for square matrix a of dimension n.
 
     Parameters
@@ -90,7 +90,7 @@ def arnoldi_decomposition(A, V, H, invariant_tol=None, *, max_dim=None):
 
     assert max_dim <= m, "max_dim > m violated"
 
-    for j in range(max_dim):
+    for j in range(start_dim, max_dim):
         w = V[:, j+1]
         w[:] = A @ V[:, j]
 
