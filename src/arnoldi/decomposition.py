@@ -41,12 +41,6 @@ class ArnoldiDecomposition:
         return m
 
 
-def _largest_eigvals(H, n_ev):
-    eigvals, eigvecs = nlin.eig(H)
-    ind = np.argsort(np.abs(eigvals))[:-n_ev-1:-1]
-    return eigvals[ind], eigvecs[:, ind]
-
-
 def arnoldi_decomposition(A, V, H, invariant_tol=None, *, start_dim=0, max_dim=None):
     """Run the arnoldi decomposition for square matrix a of dimension n.
 
@@ -116,6 +110,10 @@ def arnoldi_decomposition(A, V, H, invariant_tol=None, *, start_dim=0, max_dim=N
     return V[:, :max_dim+1], H[:max_dim+1, :max_dim], max_dim
 
 
+def _largest(x):
+    return np.argsort(-np.abs(x))
+
+
 @dataclasses.dataclass
 class RitzDecomposition:
     values: np.ndarray
@@ -125,7 +123,7 @@ class RitzDecomposition:
     approximate_residuals: np.ndarray
 
     @classmethod
-    def from_v_and_h(cls, V, H, n_ritz, *, max_dim=None):
+    def from_v_and_h(cls, V, H, n_ritz, *, max_dim=None, sort_function=None):
         """
         Compute the ritz decomposition for the Arnoldi decomposition V and H. Assumes
         A * V[:, :m] = V[:, :m] * H[:m, :m] + H[m, m-1] * (V[:, m] * e_m^H)
@@ -162,7 +160,14 @@ class RitzDecomposition:
         V_m = V[:, :max_dim]
         H_m = H[:max_dim, :max_dim]
 
-        ritz_values, S = _largest_eigvals(H_m, n_ritz)
+        if sort_function is None:
+            sort_function = _largest
+
+        eigvals, eigvecs = nlin.eig(H_m)
+        ind = sort_function(eigvals)[:n_ritz]
+        S = eigvecs[:, ind]
+
+        ritz_values = eigvals[ind]
         ritz_vectors = V_m @ S
 
         approximate_residuals = np.abs(H[max_dim, max_dim-1] * S[-1])
