@@ -29,7 +29,7 @@ def naive_explicit_restarts(A, m=None, *, stopping_criterion=None, max_restarts=
         ritz = RitzDecomposition.from_v_and_h(V, H, k)
         if ritz.approximate_residuals[0] < tol:
             residuals = ritz.compute_true_residuals(A)
-            if residuals[0] / max(ritz.values[0], tol) < tol:
+            if residuals[0] / max(np.abs(ritz.values[0]), tol) < tol:
                 return ritz, True, i
         # FIXME: should take the ritz vector w/ the lowest residual
         v0 = ritz.vectors[:, 0]
