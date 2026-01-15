@@ -13,6 +13,10 @@ def rand_normalized_vector(n, dtype=np.float64):
     return v
 
 
+def arg_largest_magnitude(x):
+    return np.argsort(-np.abs(x))
+
+
 _TREXC_FUNCTION = {
     np.dtype("float32"): strexc,
     np.dtype("float64"): dtrexc,
@@ -32,7 +36,7 @@ def ordered_schur(a, output="real", *, sort_function=None):
         trexc_function = _TREXC_FUNCTION[a.dtype]
 
     if sort_function is None:
-        sort_function = lambda values: np.argsort(np.abs(values))
+        sort_function = arg_largest_magnitude
 
     T, Z = schur(a, output=output)
     n = T.shape[0]

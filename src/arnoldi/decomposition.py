@@ -3,7 +3,7 @@ import dataclasses
 import numpy as np
 import numpy.linalg as nlin
 
-from .utils import rand_normalized_vector
+from .utils import arg_largest_magnitude, rand_normalized_vector
 
 
 norm = nlin.norm
@@ -110,10 +110,6 @@ def arnoldi_decomposition(A, V, H, invariant_tol=None, *, start_dim=0, max_dim=N
     return V[:, :max_dim+1], H[:max_dim+1, :max_dim], max_dim
 
 
-def _largest(x):
-    return np.argsort(-np.abs(x))
-
-
 @dataclasses.dataclass
 class RitzDecomposition:
     values: np.ndarray
@@ -161,7 +157,7 @@ class RitzDecomposition:
         H_m = H[:max_dim, :max_dim]
 
         if sort_function is None:
-            sort_function = _largest
+            sort_function = arg_largest_magnitude
 
         eigvals, eigvecs = nlin.eig(H_m)
         ind = sort_function(eigvals)[:n_ritz]
