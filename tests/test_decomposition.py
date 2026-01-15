@@ -270,7 +270,7 @@ class TestRitzDecomposition:
     def test_simple(self, which, sort_function):
         ## Given
         A = mark(10)
-        m = 20
+        m = 30
         k = 2
         precision = 3
 
