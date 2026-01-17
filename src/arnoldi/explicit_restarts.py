@@ -95,7 +95,7 @@ def explicit_restarts_with_deflation(
     assert A.shape[1] == n
 
     if max_dim is None:
-        max_dim = min(20, nev * 2 + 1)
+        max_dim = min(max(2 * nev + 1, 20), n)
 
     dtype = np.complex128
 

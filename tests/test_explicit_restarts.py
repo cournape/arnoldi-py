@@ -145,9 +145,14 @@ class TestExplicitRestartsWithDeflation:
         ## Given
         A = mark(10)
         k = 3
-        tol = 1e-16
+        # Very low tolerance, but few restarts and small Krylov space dimension
+        # to cause convergence failures
         max_restarts = 10
+        tol = 1e-16
+        max_dim = 5
 
         ## When / then
         with pytest.raises(ValueError, match="Could not converge for value 0"):
-            self.ensure_values_match_with_arpack(A, k, tol=tol, max_restarts=max_restarts)
+            self.ensure_values_match_with_arpack(
+                A, k, max_dim=max_dim, tol=tol, max_restarts=max_restarts
+            )
