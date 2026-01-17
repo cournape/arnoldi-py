@@ -20,7 +20,7 @@ jobs:
         with:
           args: "--version"
       - name: Install the project
-        run: uv sync --group test
+        run: uv sync --no-dev --group test
       - name: Run tests
         run: make tests
       - name: Check format
