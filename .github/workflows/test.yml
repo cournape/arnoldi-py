@@ -18,4 +18,6 @@ jobs:
       - name: Install the project
         run: uv sync --group test
       - name: Run tests
-        run: uv run pytest tests
+        run: make tests
+      - name: Check format
+        run: make lint
