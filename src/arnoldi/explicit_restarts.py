@@ -87,7 +87,7 @@ def explicit_restarts_with_deflation(
         tol = stopping_criterion
 
     if sort_function is None:
-        sort_function =  arg_largest_magnitude
+        sort_function = arg_largest_magnitude
 
     assert max_restarts > 0
 
