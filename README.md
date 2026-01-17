@@ -5,6 +5,8 @@ on NumPy and BLAS/LAPACK, without depending on ARPACK. Ultimately, the hope is
 to be a viable replacement for scipy.sparse.eigen, and remove the fortran
 dependency.
 
+It is not usable yet.
+
 ## Why ?
 
 ARPACK-NG is a fortran library for sparse eigen solvers. It has the following issues:
@@ -17,28 +19,37 @@ ARPACK-NG is a fortran library for sparse eigen solvers. It has the following is
 ## TODO
 
 - [ ] Fundamental support for arbitrary matrices, largest eigen values only
-    - [x] basic arnoldi decomp w/ tests
-    - [ ] add a key set of test matrices, using sparse matrix suite + synthetic
+  - [x] basic arnoldi decomp w/ tests
+  - [x] add a key set of test matrices, using sparse matrix suite + synthetic
       (Markov, Laplace, etc.)
-    - [ ] convergence tracking on Ritz values
-    - [ ] explicit restart support with deflation
-    - [ ] krylov-schur method
-- [ ] add support for shift-invert (arbitrary eigen values)
-- [ ] extend to Hermitian/symmetric matrices (Lanczos)
+  - [x] convergence tracking on Ritz values
+  - [x] explicit restart support with deflation
+  - [ ] Krylov-schur method + more robust convergence criterion
+- [ ] add support for calculation in real space for real matrices
+- [ ] optimize for the case of Hermitian/symmetric matrices (Lanczos)
+- Post 1.0:
+  - [ ] LinearOperator support
+  - [ ] add support for shift-invert (arbitrary eigen values)
+  - [ ] single precision ?
+  - [ ] optimization:
+    - [ ] optimize orthonormalization
+    - [ ] ensure memory space is mostly V and nothing else as function of input
+    size
+    - [ ] block Krylov-Schur ?
 
 ## Existing alternative implementations
 
 - matlab:
-    - [KrylovSchur](https://github.com/dingxiong/KrylovSchur). Warning: no license.
-    - [Various implementations of Lanczos, including selective orthogonalization](https://sites.cs.ucsb.edu/~gilbert/cs240a/matlab/eigenvals/). Warning: no license.
+  - [KrylovSchur](https://github.com/dingxiong/KrylovSchur). Warning: no license.
+  - [Various implementations of Lanczos, including selective orthogonalization](https://sites.cs.ucsb.edu/~gilbert/cs240a/matlab/eigenvals/). Warning: no license.
 - julia
-    - [Complete toolking in pure julia](https://github.com/Jutho/KrylovKit.jl)
-        - includes linsolve, expm in addition to eigen value solvers
-    - [Faithful reimplementation of ARPACK in pure julia](https://github.com/dgleich/GenericArpack.jl)
-    - [The Arnold method with Krulov-Schur restart, natively in pure Julia](https://github.com/JuliaLinearAlgebra/ArnoldiMethod.jl/)
-        - According to [https://discourse.julialang.org/t/ann-arnoldimethod-jl-v0-4/110604](https://discourse.julialang.org/t/ann-arnoldimethod-jl-v0-4/110604), it is more stable than ARPACK.
-        - implementation ~ 2k julia (not including tests)
-        - license compatible with SciPy (MIT-like)
+  - [Complete toolking in pure julia](https://github.com/Jutho/KrylovKit.jl)
+    - includes linsolve, expm in addition to eigen value solvers
+  - [Faithful reimplementation of ARPACK in pure julia](https://github.com/dgleich/GenericArpack.jl)
+  - [The Arnold method with Krulov-Schur restart, natively in pure Julia](https://github.com/JuliaLinearAlgebra/ArnoldiMethod.jl/)
+    - According to [https://discourse.julialang.org/t/ann-arnoldimethod-jl-v0-4/110604](https://discourse.julialang.org/t/ann-arnoldimethod-jl-v0-4/110604), it is more stable than ARPACK.
+    - implementation ~ 2k julia (not including tests)
+    - license compatible with SciPy (MIT-like)
 
 ## References
 
