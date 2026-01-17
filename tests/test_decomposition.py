@@ -252,31 +252,37 @@ class TestEigenValues:
 
 
 class TestRitzDecomposition:
-    def compute_ritz(self, A, m, k):
+    def compute_ritz(self, A, m, k, sort_function=None):
         n = A.shape[0]
         arnoldi = ArnoldiDecomposition(n, m)
         arnoldi.initialize()
         arnoldi.iterate(A)
 
-        return RitzDecomposition.from_v_and_h(arnoldi.V, arnoldi.H, k)
+        return RitzDecomposition.from_v_and_h(arnoldi.V, arnoldi.H, k, sort_function=sort_function)
 
+    @pytest.mark.parametrize(
+        "which, sort_function", [
+            ("LM", lambda x: np.argsort(-np.abs(x))),
+            ("LR", lambda x: np.argsort(-np.real(x))),
+        ]
+    )
     @pytest.mark.flaky(reruns=MAX_RETRIES_SHORT)
-    def test_simple(self):
+    def test_simple(self, which, sort_function):
         ## Given
         A = mark(10)
-        m = 20
+        m = 30
         k = 2
         precision = 3
 
-        r_vals = sp.linalg.eigs(A, k)[0]
+        r_vecs = sp.linalg.eigs(A, k, which=which)[1]
 
         ## When
-        ritz = self.compute_ritz(A, m, k)
+        ritz = self.compute_ritz(A, m, k, sort_function=sort_function)
 
         ## Then
-        np.testing.assert_allclose(norm(sort_by_criteria(ritz.values)),
-                                   norm(sort_by_criteria(r_vals)), rtol=1e-3,
-                                   atol=ATOL)
+        overlap = np.linalg.norm(ritz.vectors.T @ r_vecs) / np.sqrt(k)
+        np.testing.assert_allclose(overlap, 1, rtol=1e-4, atol=ATOL)
+
         residuals = norm(A @ ritz.vectors - ritz.values * ritz.vectors)
         assert residuals <= 2 * 10**(-precision)
 

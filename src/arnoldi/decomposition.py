@@ -3,7 +3,7 @@ import dataclasses
 import numpy as np
 import numpy.linalg as nlin
 
-from .utils import rand_normalized_vector
+from .utils import arg_largest_magnitude, rand_normalized_vector
 
 
 norm = nlin.norm
@@ -30,7 +30,8 @@ class ArnoldiDecomposition:
         return np.sqrt(np.finfo(self._dtype).eps)
 
     def initialize(self, init_vector=None):
-        init_vector = init_vector or rand_normalized_vector(self.n, self._dtype)
+        if init_vector is None:
+            init_vector = rand_normalized_vector(self.n, self._dtype)
         self.V[:, 0] = init_vector
 
     def iterate(self, A):
@@ -40,13 +41,7 @@ class ArnoldiDecomposition:
         return m
 
 
-def _largest_eigvals(H, n_ev):
-    eigvals, eigvecs = nlin.eig(H)
-    ind = np.argsort(np.abs(eigvals))[:-n_ev-1:-1]
-    return eigvals[ind], eigvecs[:, ind]
-
-
-def arnoldi_decomposition(A, V, H, invariant_tol=None, *, max_dim=None):
+def arnoldi_decomposition(A, V, H, invariant_tol=None, *, start_dim=0, max_dim=None):
     """Run the arnoldi decomposition for square matrix a of dimension n.
 
     Parameters
@@ -74,7 +69,8 @@ def arnoldi_decomposition(A, V, H, invariant_tol=None, *, max_dim=None):
         invariant is lower dimension than max_dim
     """
     # Logic of sqrt copied from Julia's ArnoldiMethod.jl package
-    invariant_tol = invariant_tol or np.sqrt(np.finfo(A.dtype).eps)
+    if invariant_tol is None:
+        invariant_tol = np.sqrt(np.finfo(A.dtype).eps)
 
     n = A.shape[0]
     m = V.shape[1] - 1
@@ -88,21 +84,28 @@ def arnoldi_decomposition(A, V, H, invariant_tol=None, *, max_dim=None):
 
     assert max_dim <= m, "max_dim > m violated"
 
-    for j in range(max_dim):
-        v = V[:, j+1]
-        v[:] = A @ V[:, j]
+    for j in range(start_dim, max_dim):
+        w = V[:, j+1]
+        w[:] = A @ V[:, j]
 
-        # Modified Gram-Schmidt (orthonormalization)
+        # Modified Gram-Schmidt (MGS) for orthonormalization
         for i in range(j + 1):
-            H[i, j] = np.vdot(V[:, i], v)
-            v -= H[i, j] * V[:, i]
+            H[i, j] = np.vdot(V[:, i], w)
+            w -= H[i, j] * V[:, i]
 
-        H[j + 1, j] = norm(v)
+        # Double reorthonormalization with GMS
+        # FIXME: use DGKS criterion to avoid unneeded double reortho
+        for i in range(j + 1):
+            coeff = np.vdot(V[:, i], w)
+            H[i, j] += coeff
+            w -= coeff * V[:, i]
+
+        H[j + 1, j] = norm(w)
 
         if H[j + 1, j] < invariant_tol:
             max_dim = j + 1
             return V[:, :max_dim+1], H[:max_dim+1, :max_dim], max_dim
-        v /= H[j + 1, j]
+        w /= H[j + 1, j]
 
     return V[:, :max_dim+1], H[:max_dim+1, :max_dim], max_dim
 
@@ -116,7 +119,7 @@ class RitzDecomposition:
     approximate_residuals: np.ndarray
 
     @classmethod
-    def from_v_and_h(cls, V, H, n_ritz, *, max_dim=None):
+    def from_v_and_h(cls, V, H, n_ritz, *, max_dim=None, sort_function=None):
         """
         Compute the ritz decomposition for the Arnoldi decomposition V and H. Assumes
         A * V[:, :m] = V[:, :m] * H[:m, :m] + H[m, m-1] * (V[:, m] * e_m^H)
@@ -153,7 +156,14 @@ class RitzDecomposition:
         V_m = V[:, :max_dim]
         H_m = H[:max_dim, :max_dim]
 
-        ritz_values, S = _largest_eigvals(H_m, n_ritz)
+        if sort_function is None:
+            sort_function = arg_largest_magnitude
+
+        eigvals, eigvecs = nlin.eig(H_m)
+        ind = sort_function(eigvals)[:n_ritz]
+        S = eigvecs[:, ind]
+
+        ritz_values = eigvals[ind]
         ritz_vectors = V_m @ S
 
         approximate_residuals = np.abs(H[max_dim, max_dim-1] * S[-1])
