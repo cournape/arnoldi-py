@@ -16,6 +16,15 @@ ARPACK-NG is a fortran library for sparse eigen solvers. It has the following is
   large problems, e.g. A Krylov-Schur Algorithm for Large Eigenproblems, G. W.
   Stewart, SIAM J. M ATRIX A NAL. A PPL ., Vol. 23, No. 3, pp. 601–614
 
+## AI policy
+
+AI tools such as Claude are extensively used for code review, literature review
+and understanding alternative, license-compatible implementations.
+
+However, as the code is a candidate to be incorporated into SciPy codebase, the
+code itself is not generated using AI, and all the code has been manually
+written from the literature.
+
 ## TODO
 
 For a first 1.0 release:
