@@ -23,7 +23,8 @@ and understanding alternative, license-compatible implementations.
 
 However, as the code is a candidate to be incorporated into SciPy codebase, the
 code itself is not generated using AI, and all the code has been manually
-written from the literature.
+written from the literature. Exceptions are trivial scripts in the scripts/ directory. Files AI-generated
+will contain a header mentioning this.
 
 ## TODO
 
@@ -35,7 +36,7 @@ For a first 1.0 release:
       (Markov, Laplace, etc.)
   - [x] convergence tracking on Ritz values
   - [x] explicit restart support with deflation
-  - [ ] Krylov-schur method
+  - [x] Krylov-schur method
   - [ ] More robust convergence criteria (relative/absolute/A norm)
   - [ ] customizable orthonormalization
 - [ ] Compare performance w/ ARPACK in terms of #matvecs and runtime
