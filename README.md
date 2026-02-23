@@ -35,14 +35,19 @@ For a first 1.0 release:
       (Markov, Laplace, etc.)
   - [x] convergence tracking on Ritz values
   - [x] explicit restart support with deflation
-  - [ ] Krylov-schur method + more robust convergence criterion
-- [ ] Compare performance w/ ARPACK in terms of #matvecs
+  - [ ] Krylov-schur method
+  - [ ] More robust convergence criteria (relative/absolute/A norm)
+  - [ ] customizable orthonormalization
+- [ ] Compare performance w/ ARPACK in terms of #matvecs and runtime
+  - [ ] compare MGS vs double GS w/ DGKS vs others in terms of precision
+  - [ ] implement locking and dynamic p
+  - [ ] handle happy breakdown in Krylov-Schur
 - [ ] add support for calculation in real space for real matrices
-- [ ] optimize for the case of Hermitian/symmetric matrices (Lanczos)
 - [ ] LinearOperator support
 
 Post 1.0:
 
+- [ ] optimize for the case of Hermitian/symmetric matrices (Lanczos)
 - [ ] add support for shift-invert (arbitrary eigen values)
 - [ ] add support for general inverses problems
 - [ ] single precision support
