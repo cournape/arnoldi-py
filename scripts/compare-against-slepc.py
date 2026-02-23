@@ -19,8 +19,10 @@ Notes
   under a plain key.
 """
 
-import sys
 import argparse
+import os.path
+import sys
+
 import numpy as np
 import scipy.io
 import scipy.sparse as sp
@@ -32,7 +34,13 @@ from petsc4py import PETSc
 from slepc4py import SLEPc
 
 
-_WHICH_TO_SORT = {
+HERE = os.path.dirname(__file__)
+sys.path.insert(0, HERE)
+
+from utils import load_suitesparse_mat
+
+
+WHICH_TO_SORT = {
     "LM": SLEPc.EPS.Which.LARGEST_MAGNITUDE,
     "LR": SLEPc.EPS.Which.LARGEST_REAL,
 }
@@ -40,40 +48,6 @@ _WHICH_TO_SORT = {
 # ──────────────────────────────────────────────────────────────
 # 1.  I/O helpers
 # ──────────────────────────────────────────────────────────────
-
-def load_suitesparse_mat(path: str) -> sp.csr_matrix:
-    """
-    Load a SuiteSparse MATLAB .mat file.
-
-    SuiteSparse stores matrices as:
-        mat['Problem']['A'][0,0]  (the common layout)
-    but sometimes as a plain top-level variable.  We try both.
-    """
-    data = scipy.io.loadmat(path, squeeze_me=False)
-
-    # Try the SuiteSparse struct layout first
-    if "Problem" in data:
-        prob = data["Problem"]
-        # prob is a (1,1) structured array; the matrix lives at field 'A'
-        A = prob["A"][0, 0]
-        if sp.issparse(A):
-            return A.tocsr()
-
-    # Fallback: look for the first sparse matrix in the file
-    for key, val in data.items():
-        if key.startswith("_"):          # skip __header__ etc.
-            continue
-        if sp.issparse(val):
-            return val.tocsr()
-        # Structured array whose first field is sparse
-        if hasattr(val, "dtype") and val.dtype.names:
-            for field in val.dtype.names:
-                candidate = val[field][0, 0]
-                if sp.issparse(candidate):
-                    return candidate.tocsr()
-
-    raise ValueError(f"No sparse matrix found in {path!r}")
-
 
 def scipy_csr_to_petsc(A_scipy: sp.csr_matrix, comm) -> PETSc.Mat:
     """
@@ -105,25 +79,25 @@ def scipy_csr_to_petsc(A_scipy: sp.csr_matrix, comm) -> PETSc.Mat:
 # 2.  Matvec counter (Python shell mat wrapping a PETSc AIJ mat)
 # ──────────────────────────────────────────────────────────────
 
-class _MatvecCounterCtx:
+class MatvecCounter:
     """Context object used by PETSc's MATPYTHON shell."""
 
     def __init__(self, A_petsc: PETSc.Mat):
         self._A = A_petsc
-        self.count = 0
+        self.matvecs = 0
 
     def mult(self, A_shell, x, y):
         """y = A * x  — called for every forward matvec."""
-        self.count += 1
+        self.matvecs += 1
         self._A.mult(x, y)
 
     def multTranspose(self, A_shell, x, y):
         """y = A^T * x  — called when SLEPc needs the transpose."""
-        self.count += 1
+        self.matvecs += 1
         self._A.multTranspose(x, y)
 
 
-def wrap_with_matvec_counter(A_petsc: PETSc.Mat) -> tuple[PETSc.Mat, _MatvecCounterCtx]:
+def wrap_with_matvec_counter(A_petsc: PETSc.Mat) -> tuple[PETSc.Mat, MatvecCounter]:
     """
     Wrap *A_petsc* in a MATPYTHON shell that counts every matvec.
 
@@ -131,10 +105,10 @@ def wrap_with_matvec_counter(A_petsc: PETSc.Mat) -> tuple[PETSc.Mat, _MatvecCoun
     -------
     A_shell : PETSc.Mat
         Drop-in replacement for A_petsc to pass to SLEPc.
-    ctx : _MatvecCounterCtx
-        After solving, read ``ctx.count`` for the total matvec count.
+    ctx : MatvecCounter
+        After solving, read ``ctx.matvecs`` for the total matvec count.
     """
-    ctx = _MatvecCounterCtx(A_petsc)
+    ctx = MatvecCounter(A_petsc)
     A_shell = PETSc.Mat().createPython(
         A_petsc.getSizes(), context=ctx, comm=A_petsc.getComm()
     )
@@ -213,7 +187,7 @@ def solve_largest_real(
     eps.setProblemType(SLEPc.EPS.ProblemType.NHEP)   # Non-Hermitian Eigenproblem
 
     # ── Which eigenvalues ───────────────────────────────────────
-    mode = _WHICH_TO_SORT[which]
+    mode = WHICH_TO_SORT[which]
     eps.setWhichEigenpairs(mode)
 
     eps.setType(SLEPc.EPS.Type.KRYLOVSCHUR)
@@ -289,7 +263,7 @@ def parse_args() -> argparse.Namespace:
                         help="Maximum iterations (default: 10000)")
     parser.add_argument("--no-monitor", action="store_true",
                         help="Disable per-iteration convergence output")
-    parser.add_argument("--which", choices=list(_WHICH_TO_SORT), default="LM",
+    parser.add_argument("--which", choices=list(WHICH_TO_SORT), default="LM",
                         help="Which eigenvalues to target: LM (largest magnitude) "
                              "or LR (largest real part). Default: LM")
     return parser.parse_args(clean)
@@ -348,7 +322,7 @@ def main():
             if h["errors"]:
                 PETSc.Sys.Print(f"  iter {h['iter']:4d}  err {h['errors'][0]:.3e}")
 
-    PETSc.Sys.Print(f"\nTotal matvecs against A : {mv_ctx.count}")
+    PETSc.Sys.Print(f"\nTotal matvecs against A : {mv_ctx.matvecs}")
 
     A_shell.destroy()
     A_petsc.destroy()
