@@ -3,42 +3,10 @@ import dataclasses
 import numpy as np
 import numpy.linalg as nlin
 
-from .utils import arg_largest_magnitude, rand_normalized_vector
+from .utils import arg_largest_magnitude
 
 
 norm = nlin.norm
-
-
-class ArnoldiDecomposition:
-    """ Create an arnoldi solver for operators of dimension n, with a Krylov
-    basis of up to m dimensions.
-    """
-    def __init__(self, n, m, dtype=np.complex128):
-        self.n = n
-        self.m = m
-
-        self.V = np.zeros((n, m+1), dtype=dtype)
-        self.H = np.zeros((m+1, m), dtype=dtype)
-
-    @property
-    def _dtype(self):
-        return self.H.dtype
-
-    @property
-    def _atol(self):
-        # Logic of sqrt copied from Julia's ArnoldiMethod.jl package
-        return np.sqrt(np.finfo(self._dtype).eps)
-
-    def initialize(self, init_vector=None):
-        if init_vector is None:
-            init_vector = rand_normalized_vector(self.n, self._dtype)
-        self.V[:, 0] = init_vector
-
-    def iterate(self, A):
-        _, _, m = arnoldi_decomposition(A, self.V, self.H, self._atol)
-        if m != self.m:
-            raise ValueError("Lucky break not supported yet")
-        return m
 
 
 def arnoldi_decomposition(A, V, H, invariant_tol=None, *, start_dim=0, max_dim=None):
