@@ -73,9 +73,11 @@ for k in range(K):
 It is not recommended for real use yet. I expect the API to change, especially
 in terms of convergence tracking and history.
 
-For more complex examples, look at the scripts in the [`scripts/`](scripts
-directory). It can compare ARPACK and SLPEc (to be installed separately)
-against this implementation for matrices in the sparse suite.
+For more complex examples, look at the scripts [SLEPC
+script](scripts/compare-against-slepc.py) and [ARPACK
+script](scripts/compare-against-arpack.py).  It can compare ARPACK and SLPEc (to
+be installed separately) against this implementation for matrices in the sparse
+suite.
 
 ## Why ?
 
