@@ -5,7 +5,77 @@ on NumPy and BLAS/LAPACK, without depending on ARPACK. Ultimately, the hope is
 to be a viable replacement for scipy.sparse.eigen, and remove the fortran
 dependency.
 
-It is not usable yet.
+## How to install
+
+The project is using uv. Assuming you have uv installed, simply do
+
+``` shell
+uv sync
+```
+
+## Example of usage
+
+``` python
+import numpy as np
+
+from scipy.sparse.linalg import eigs
+
+from arnoldi.krylov_schur import partial_schur
+from arnoldi.matrices import mark
+from arnoldi.utils import arg_largest_real
+
+
+# Markov walk matrix
+A = mark(50)
+
+TOL = 1e-8
+MAX_RESTARTS = 1_000
+MAX_DIMS = 20
+K = 5
+WHICH = "LR"
+SORT_FUNCTION = arg_largest_real
+
+Q, T, history = partial_schur(
+    A,
+    K,
+    max_dim=MAX_DIMS,
+    stopping_criterion=TOL,
+    sort_function=SORT_FUNCTION,
+    max_restarts=MAX_RESTARTS,
+)
+# Convert Schur transform into eigenpairs
+vals, S = np.linalg.eig(T)
+vecs = Q @ S
+
+print("========== true residuals, our implementation =============")
+for k in range(K):
+    val, vec = vals[k], vecs[:, k]
+    residual = np.linalg.norm(A @ vec - val * vec)
+    norm_residual = residual / np.abs(val)
+    print(
+        f"Residual {k}, value is {np.real(val):.7}, res is {residual:.3e}, norm res is {norm_residual:.3e}"
+    )
+
+# Compare to ARPACK
+vals, vecs = eigs(A, K, ncv=MAX_DIMS, maxiter=MAX_RESTARTS, which=WHICH,
+                  tol=TOL)
+
+print("========== true residuals, ARPACK (scipy) implementation =============")
+for k in range(K):
+    val, vec = vals[k], vecs[:, k]
+    residual = np.linalg.norm(A @ vec - val * vec)
+    norm_residual = residual / np.abs(val)
+    print(
+        f"Residual {k}, value is {np.real(val):.7}, res is {residual:.3e}, norm res is {norm_residual:.3e}"
+    )
+```
+
+It is not recommended for real use yet. I expect the API to change, especially
+in terms of convergence tracking and history.
+
+For more complex examples, look at the scripts in the [`scripts/`](scripts
+directory). It can compare ARPACK and SLPEc (to be installed separately)
+against this implementation for matrices in the sparse suite.
 
 ## Why ?
 
