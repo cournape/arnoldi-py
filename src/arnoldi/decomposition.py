@@ -3,6 +3,7 @@ import dataclasses
 import numpy as np
 import numpy.linalg as nlin
 
+from .ortho import double_mgs
 from .utils import arg_largest_magnitude
 
 
@@ -56,24 +57,13 @@ def arnoldi_decomposition(A, V, H, invariant_tol=None, *, start_dim=0, max_dim=N
         w = V[:, j+1]
         w[:] = A @ V[:, j]
 
-        # Modified Gram-Schmidt (MGS) for orthonormalization
-        for i in range(j + 1):
-            H[i, j] = np.vdot(V[:, i], w)
-            w -= H[i, j] * V[:, i]
-
-        # Double reorthonormalization with GMS
-        # FIXME: use DGKS criterion to avoid unneeded double reortho
-        for i in range(j + 1):
-            coeff = np.vdot(V[:, i], w)
-            H[i, j] += coeff
-            w -= coeff * V[:, i]
-
-        H[j + 1, j] = norm(w)
-
-        if H[j + 1, j] < invariant_tol:
+        beta, breakdown = double_mgs(w, V[:, :j+1], H[:j+1, j], invariant_tol)
+        if breakdown:
             max_dim = j + 1
             return V[:, :max_dim+1], H[:max_dim+1, :max_dim], max_dim
-        w /= H[j + 1, j]
+        else:
+            H[j + 1, j] = beta
+            w /= beta
 
     return V[:, :max_dim+1], H[:max_dim+1, :max_dim], max_dim
 
