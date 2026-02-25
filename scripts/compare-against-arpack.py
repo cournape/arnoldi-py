@@ -1,5 +1,7 @@
 # AI note: this script was mostly generated using AI (claude code)
 import argparse
+import os.path
+import sys
 import time
 
 import numpy as np
@@ -14,10 +16,13 @@ from arnoldi.krylov_schur import partial_schur
 from arnoldi.utils import arg_largest_magnitude, arg_largest_real
 
 
-_WHICH_TO_SORT = {
-    "LM": arg_largest_magnitude,
-    "LR": arg_largest_real,
-}
+HERE = os.path.dirname(__file__)
+sys.path.insert(0, HERE)
+
+from utils import (
+    WHICH_TO_SORT, MatvecCounter, find_best_matching, load_suitesparse_mat,
+    print_residuals
+)
 
 
 def grcar_matrix(n, k=3):
@@ -38,23 +43,6 @@ def clement_matrix(n):
     return A
 
 
-def load_suitesparse_mat(path: str) -> sp.csr_matrix:
-    """
-    Load a SuiteSparse MATLAB .mat file.
-    """
-    data = scipy.io.loadmat(path, squeeze_me=False)
-
-    # Try the SuiteSparse struct layout first
-    prob = data.get("Problem")
-    if prob:
-        # prob is a (1,1) structured array; the matrix lives at field 'A'
-        A = prob["A"][0, 0]
-        if sp.issparse(A):
-            return A.tocsr()
-
-    raise ValueError(f"No sparse matrix found in {path!r}")
-
-
 def write_suitesparse_mat(A, path: str) -> None:
     """
     Write a given sparse matrix as a SuiteSparse MATLAB .mat file.
@@ -62,33 +50,6 @@ def write_suitesparse_mat(A, path: str) -> None:
     problem = np.empty((1, 1), dtype=[("A", object)])
     problem["A"][0, 0] = sp.csc_matrix(A)
     scipy.io.savemat(path, {"Problem": problem})
-
-
-class MatvecCounter(LinearOperator):
-    def __init__(self, A):
-        self.A = A
-        self.shape = A.shape
-        self.dtype = np.dtype(A.dtype)
-        self.count = 0
-
-    def _matvec(self, x):
-        self.count += 1
-        return self.A @ x
-
-    def _rmatvec(self, x):
-        self.count += 1
-        return self.A.conj().T @ x
-
-
-def print_residuals(label, A, vals, vecs):
-    print(f"\n--- True residuals: {label} ---")
-    for k, (val, vec) in enumerate(zip(vals, vecs.T)):
-        res = np.linalg.norm(A @ vec - val * vec)
-        norm_res = res / abs(val)
-        print(
-            f"  eigval[{k}] = {val.real:+.6g}{val.imag:+.6g}j"
-            f"    |Av-\u03bbv|={res:.3e}    |Av-\u03bbv|/|\u03bb|={norm_res:.3e}"
-        )
 
 
 def main():
@@ -122,7 +83,7 @@ def main():
     )
     parser.add_argument(
         "--which",
-        choices=list(_WHICH_TO_SORT),
+        choices=list(WHICH_TO_SORT),
         default="LM",
         help="Which eigenvalues to target: LM (largest magnitude) "
         "or LR (largest real part). Default: LM",
@@ -133,7 +94,7 @@ def main():
     tol = args.tol
     max_it = args.max_it
     which = args.which
-    sort_function = _WHICH_TO_SORT[which]
+    sort_function = WHICH_TO_SORT[which]
     p = args.p
 
     if p is None:
@@ -177,7 +138,9 @@ def main():
     arpack_vals = arpack_vals[idx]
     arpack_vecs = arpack_vecs[:, idx]
 
-    print(f"  matvecs={arpack_counter.count}, elapsed={arpack_elapsed:.2f}s")
+    matvecs = arpack_counter.matvecs
+    n_iters = (matvecs - max_dim) // (max_dim - nev)
+    print(f"  matvecs={arpack_counter.matvecs}, elapsed={arpack_elapsed:.2f}s for {n_iters} iterations")
 
     # ------------------------------------------------------------------
     # partial_schur
@@ -205,7 +168,9 @@ def main():
     ps_eig_vecs = ps_eig_vecs[:, idx]
 
     ps_matvecs = int(np.max(history.matvecs))
+    n_iters = np.max(history.restarts)
     print(f"  matvecs={ps_matvecs}, elapsed={ps_elapsed:.2f}s")
+    print(f"  matvecs={ps_matvecs}, elapsed={ps_elapsed:.2f}s for {n_iters} iterations")
 
     # ------------------------------------------------------------------
     # True residuals
@@ -216,7 +181,7 @@ def main():
     # ------------------------------------------------------------------
     # Matvec comparison
     # ------------------------------------------------------------------
-    arpack_mv = arpack_counter.count
+    arpack_mv = arpack_counter.matvecs
     pct = (ps_matvecs - arpack_mv) / arpack_mv * 100
     direction = "more" if pct >= 0 else "fewer"
 
@@ -225,6 +190,14 @@ def main():
     print(f"  partial_schur: {ps_matvecs} matvecs  ({ps_elapsed:.2f}s)")
     print(f"  partial_schur uses {abs(pct):.1f}% {direction} matvecs than ARPACK")
     print(history)
+
+    print(arpack_vals)
+    print(ps_eig_vals)
+
+    # Ensure the eigenvalues match. This check + ensure normalized residuals
+    # are close to 0 should be enough to ensure the output is correct.
+    x, y = find_best_matching(arpack_vals, ps_eig_vals)
+    np.testing.assert_allclose(x, y, rtol=tol)
 
 
 if __name__ == "__main__":
