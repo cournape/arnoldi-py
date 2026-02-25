@@ -3,7 +3,7 @@ import dataclasses
 import numpy as np
 import numpy.linalg as nlin
 
-from .ortho import double_mgs
+from .ortho import dgks_gs
 from .utils import arg_largest_magnitude
 
 
@@ -57,7 +57,7 @@ def arnoldi_decomposition(A, V, H, invariant_tol=None, *, start_dim=0, max_dim=N
         w = V[:, j+1]
         w[:] = A @ V[:, j]
 
-        beta, breakdown = double_mgs(w, V[:, :j+1], H[:j+1, j], invariant_tol)
+        beta, breakdown = dgks_gs(w, V[:, :j+1], H[:j+1, j], invariant_tol)
         if breakdown:
             max_dim = j + 1
             return V[:, :max_dim+1], H[:max_dim+1, :max_dim], max_dim
