@@ -113,6 +113,10 @@ def main():
     print(
         f"  ARPACK:       {1000 * r_elapsed/r_matvecs:.2f} ms per matvec {1000 * r_elapsed/r_n_iters:.2g} ms per iter"
     )
+
+    print(r_vals)
+    print(vals)
+
     # Ensure the eigenvalues match. This check + ensure normalized residuals
     # are close to 0 should be enough to ensure the output is correct
     x, y = find_best_matching(r_vals, vals)

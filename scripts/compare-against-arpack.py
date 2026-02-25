@@ -20,7 +20,8 @@ HERE = os.path.dirname(__file__)
 sys.path.insert(0, HERE)
 
 from utils import (
-    WHICH_TO_SORT, MatvecCounter, load_suitesparse_mat, print_residuals
+    WHICH_TO_SORT, MatvecCounter, find_best_matching, load_suitesparse_mat,
+    print_residuals
 )
 
 
@@ -189,6 +190,14 @@ def main():
     print(f"  partial_schur: {ps_matvecs} matvecs  ({ps_elapsed:.2f}s)")
     print(f"  partial_schur uses {abs(pct):.1f}% {direction} matvecs than ARPACK")
     print(history)
+
+    print(arpack_vals)
+    print(ps_eig_vals)
+
+    # Ensure the eigenvalues match. This check + ensure normalized residuals
+    # are close to 0 should be enough to ensure the output is correct.
+    x, y = find_best_matching(arpack_vals, ps_eig_vals)
+    np.testing.assert_allclose(x, y, rtol=tol)
 
 
 if __name__ == "__main__":

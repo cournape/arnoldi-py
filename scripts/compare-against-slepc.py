@@ -22,6 +22,7 @@ Notes
 import argparse
 import os.path
 import sys
+import time
 
 import numpy as np
 import scipy.io
@@ -292,6 +293,7 @@ def main():
     tracker = None if args.no_monitor else ConvergenceTracker()
 
     # ── Solve ───────────────────────────────────────────────────
+    t0 = time.perf_counter()
     results = solve_largest_real(
         A_shell,
         k       = args.nev,
@@ -301,6 +303,7 @@ def main():
         which   = args.which,
         tracker = tracker,
     )
+    elapsed = time.perf_counter() - t0
 
     # ── Print results ───────────────────────────────────────────
     PETSc.Sys.Print("\n" + "─" * 60)
@@ -323,6 +326,7 @@ def main():
                 PETSc.Sys.Print(f"  iter {h['iter']:4d}  err {h['errors'][0]:.3e}")
 
     PETSc.Sys.Print(f"\nTotal matvecs against A : {mv_ctx.matvecs}")
+    print(f"SLEPc: {mv_ctx.matvecs} matvecs, {h['iter']} iters in {elapsed:.2f}s ({PETSc.ScalarType})")
 
     A_shell.destroy()
     A_petsc.destroy()
