@@ -1,5 +1,7 @@
 import numpy as np
+from scipy.linalg import get_blas_funcs
 
+nrm2, gemv = get_blas_funcs(("nrm2", "gemv"), dtype=np.complex128)
 
 M_SQRT1_2 = np.sqrt(0.5)
 
@@ -87,19 +89,19 @@ def dgks_gs(w: np.ndarray, V: np.ndarray, h: np.ndarray, tol: float=1e-8,
     """
     j = V.shape[1]
 
-    before = np.linalg.norm(w)
+    beta_before = nrm2(w)
 
-    tmp = V.conj().T @ w
+    tmp = gemv(1.0, V, w, trans=2)
     h[:j+1] = tmp
-    w -= V @ tmp
+    w -= gemv(1.0, V, tmp)
 
-    after = np.linalg.norm(w)
+    beta = nrm2(w)
 
     # DGKS criterian for double MGS
-    if after < before * eta:
-        tmp = V.conj().T @ w
+    if beta < beta_before * eta:
+        tmp = gemv(1.0, V, w, trans=2)
         h[:j+1] += tmp
-        w -= V @ tmp
+        w -= gemv(1.0, V, tmp)
+        beta = nrm2(w)
 
-    beta = np.linalg.norm(w)
     return beta, beta < tol
