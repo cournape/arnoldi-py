@@ -3,7 +3,7 @@ Script to benchmark SLEPCs, ARPACK and our implementations across different set
 of parameters for a given matrix.
 
 See the script plot-stress-test.py about plotting the results.
-""""
+"""
 import argparse
 import csv
 import os.path
