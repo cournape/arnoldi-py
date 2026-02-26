@@ -132,15 +132,7 @@ Post 1.0:
 
 ## Existing alternative implementations
 
-- matlab:
-  - [KrylovSchur](https://github.com/dingxiong/KrylovSchur). Warning: no license.
-  - [Various implementations of Lanczos, including selective
-  orthogonalization](https://sites.cs.ucsb.edu/~gilbert/cs240a/matlab/eigenvals/).
-  Warning: no license.
 - julia
-  - [Complete toolkit in pure julia](https://github.com/Jutho/KrylovKit.jl)
-    - includes linsolve, expm in addition to eigen value solvers
-  - [Faithful reimplementation of ARPACK in pure julia](https://github.com/dgleich/GenericArpack.jl)
   - [The Arnoldi method with Krylov-Schur restart, natively in pure Julia](https://github.com/JuliaLinearAlgebra/ArnoldiMethod.jl/)
     - According to
     [https://discourse.julialang.org/t/ann-arnoldimethod-jl-v0-4/110604](https://discourse.julialang.org/t/ann-arnoldimethod-jl-v0-4/110604),
@@ -159,17 +151,17 @@ Post 1.0:
   - [Templates for the Solution of Algebraic Eigenvalue Problems: a Practical
   Guide](https://www.netlib.org/utk/people/JackDongarra/etemplates/book.html).
   Overview on numerical methods for eigen values, including dense and sparse
-    - [A shifted block Lanczos algorithm for solving sparse symmetric generalized eigenproblems.](https://www.nas.nasa.gov/assets/nas/pdf/techreports/1991/rnr-91-012.pdf)
-    - [Applied Numerical Linear Algebra](http://www.stat.uchicago.edu/~lekheng/courses/302/demmel/)
-    - [Implicit application of polynomial filters in a k-step Arnoldi method](https://ntrs.nasa.gov/api/citations/19930004220/downloads/19930004220.pdf)
-      - [An Implicitly Restarted Lanczos Method for Large Symmetric
-      Eigenvalue Problems](http://etna.mcs.kent.edu/vol.2.1994/pp1-21.dir/pp1-21.ps):
-      a specialization of the implicit ARNOLDI to the hermitian operator case.
-    - [Thick-Restart Lanczos Method For Large Symmetric Eigen Values
-    Problems](https://sdm.lbl.gov/~kewu/ps/trlan-siam.pdf): a special case of
-    Krylov-Schur for Hermitian operators
-    - [NUMERICAL METHODS FOR LARGE EIGENVALUE
-    PROBLEMS](https://www-users.cse.umn.edu/~saad/eig_book_2ndEd.pdf): 2nd
-    edition, only covers up to early 1990s techniques (explicit/implicit
-    restarted Arnoldi). It explains clearly deflation, locking and gives some
-    numerical examples that can be used as reference.
+  - [A shifted block Lanczos algorithm for solving sparse symmetric generalized eigenproblems.](https://www.nas.nasa.gov/assets/nas/pdf/techreports/1991/rnr-91-012.pdf)
+  - [Applied Numerical Linear Algebra](http://www.stat.uchicago.edu/~lekheng/courses/302/demmel/)
+  - [Implicit application of polynomial filters in a k-step Arnoldi method](https://ntrs.nasa.gov/api/citations/19930004220/downloads/19930004220.pdf)
+    - [An Implicitly Restarted Lanczos Method for Large Symmetric
+    Eigenvalue Problems](http://etna.mcs.kent.edu/vol.2.1994/pp1-21.dir/pp1-21.ps):
+    a specialization of the implicit ARNOLDI to the hermitian operator case.
+  - [Thick-Restart Lanczos Method For Large Symmetric Eigen Values
+  Problems](https://sdm.lbl.gov/~kewu/ps/trlan-siam.pdf): a special case of
+  Krylov-Schur for Hermitian operators
+  - [NUMERICAL METHODS FOR LARGE EIGENVALUE
+  PROBLEMS](https://www-users.cse.umn.edu/~saad/eig_book_2ndEd.pdf): 2nd
+  edition, only covers up to early 1990s techniques (explicit/implicit
+  restarted Arnoldi). It explains clearly deflation, locking and gives some
+  numerical examples that can be used as reference.
