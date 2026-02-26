@@ -37,7 +37,9 @@ def partial_schur(
 
     dtype = np.complex128
 
-    V = np.zeros((n, max_dim+1), dtype=dtype)
+    # Using order=F significantly speeds up the cases where orthonormalization
+    # is a bottleneck. Observed 3x performance increase in some cases
+    V = np.zeros((n, max_dim+1), dtype=dtype, order="F")
     H = np.zeros((max_dim+1, max_dim), dtype=dtype)
 
     v0 = rand_normalized_vector(n, dtype)
