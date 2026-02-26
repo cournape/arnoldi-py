@@ -110,9 +110,9 @@ For a first 1.0 release:
   - [x] explicit restart support with deflation
   - [x] Krylov-schur method
   - [ ] More robust convergence criteria (relative/absolute/A norm)
-  - [ ] customizable orthonormalization
+  - [x] customizable orthonormalization
 - [ ] Compare performance w/ ARPACK in terms of #matvecs and runtime
-  - [ ] compare MGS vs double GS w/ DGKS vs others in terms of precision
+  - [x] compare MGS vs double GS w/ DGKS vs others in terms of precision
   - [ ] implement locking and dynamic p
   - [ ] handle happy breakdown in Krylov-Schur
 - [ ] add support for calculation in real space for real matrices
@@ -125,7 +125,7 @@ Post 1.0:
 - [ ] add support for general inverses problems
 - [ ] single precision support
 - [ ] optimization:
-  - [ ] optimize orthonormalization
+  - [x] optimize orthonormalization
   - [ ] ensure memory space is mostly V and nothing else as function of input
   size
   - [ ] block Krylov-Schur ?
