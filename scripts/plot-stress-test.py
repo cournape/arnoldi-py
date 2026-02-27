@@ -24,6 +24,7 @@ x_labels = [str(t) for t in order]
 
 metrics = [
     ("elapsed", "elapsed (s)"),
+    ("elapsed_ratio", "elapsed ratio (vs ARPACK)"),
     ("matvecs", "matvecs"),
     ("restarts", "restarts"),
 ]
@@ -40,8 +41,10 @@ if n_cols == 1:
 
 for col_idx, which in enumerate(which_values):
     df_which = df[df["which"] == which]
+    arpack_elapsed = df_which[df_which["method"] == "arpack"].set_index("triplet")["elapsed"]
     for method, group in df_which.groupby("method"):
         group = group.copy()
+        group["elapsed_ratio"] = group["elapsed"].values / group["triplet"].map(arpack_elapsed)
         group["x"] = group["triplet"].map(x_positions)
         group = group.sort_values("x")
         for row_idx, (metric, _) in enumerate(metrics):
