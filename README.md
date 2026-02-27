@@ -2,7 +2,7 @@
 
 This is an attempt to write an eigensolver for sparse matrices that only relies
 on NumPy and BLAS/LAPACK, without depending on ARPACK. Ultimately, the hope is
-to be a viable replacement for scipy.sparse.eigen, and remove the fortran
+to be a viable replacement for scipy.sparse.linalg.eigs, and remove the fortran
 dependency.
 
 ## How to install
@@ -75,7 +75,7 @@ in terms of convergence tracking and history.
 
 For more complex examples, look at the scripts [SLEPC
 script](scripts/compare-against-slepc.py) and [ARPACK
-script](scripts/compare-against-arpack.py).  It can compare ARPACK and SLPEc (to
+script](scripts/compare-against-arpack.py).  It can compare ARPACK and SLEPc (to
 be installed separately) against this implementation for matrices in the sparse
 suite.
 
@@ -86,7 +86,7 @@ ARPACK-NG is a fortran library for sparse eigen solvers. It has the following is
 - the fortran code is not thread-safe. In particular, it is not re-entrant
 - it does not incorporate some of the more recent improvements discovered for
   large problems, e.g. A Krylov-Schur Algorithm for Large Eigenproblems, G. W.
-  Stewart, SIAM J. M ATRIX A NAL. A PPL ., Vol. 23, No. 3, pp. 601–614
+  Stewart, SIAM J. Matrix Anal. Appl., Vol. 23, No. 3, pp. 601–614
 
 ## AI policy
 
@@ -110,9 +110,9 @@ For a first 1.0 release:
   - [x] explicit restart support with deflation
   - [x] Krylov-schur method
   - [ ] More robust convergence criteria (relative/absolute/A norm)
-  - [ ] customizable orthonormalization
+  - [x] customizable orthonormalization
 - [ ] Compare performance w/ ARPACK in terms of #matvecs and runtime
-  - [ ] compare MGS vs double GS w/ DGKS vs others in terms of precision
+  - [x] compare MGS vs double GS w/ DGKS vs others in terms of precision
   - [ ] implement locking and dynamic p
   - [ ] handle happy breakdown in Krylov-Schur
 - [ ] add support for calculation in real space for real matrices
@@ -125,23 +125,15 @@ Post 1.0:
 - [ ] add support for general inverses problems
 - [ ] single precision support
 - [ ] optimization:
-  - [ ] optimize orthonormalization
+  - [x] optimize orthonormalization
   - [ ] ensure memory space is mostly V and nothing else as function of input
   size
   - [ ] block Krylov-Schur ?
 
 ## Existing alternative implementations
 
-- matlab:
-  - [KrylovSchur](https://github.com/dingxiong/KrylovSchur). Warning: no license.
-  - [Various implementations of Lanczos, including selective
-  orthogonalization](https://sites.cs.ucsb.edu/~gilbert/cs240a/matlab/eigenvals/).
-  Warning: no license.
 - julia
-  - [Complete toolking in pure julia](https://github.com/Jutho/KrylovKit.jl)
-    - includes linsolve, expm in addition to eigen value solvers
-  - [Faithful reimplementation of ARPACK in pure julia](https://github.com/dgleich/GenericArpack.jl)
-  - [The Arnold method with Krulov-Schur restart, natively in pure Julia](https://github.com/JuliaLinearAlgebra/ArnoldiMethod.jl/)
+  - [The Arnoldi method with Krylov-Schur restart, natively in pure Julia](https://github.com/JuliaLinearAlgebra/ArnoldiMethod.jl/)
     - According to
     [https://discourse.julialang.org/t/ann-arnoldimethod-jl-v0-4/110604](https://discourse.julialang.org/t/ann-arnoldimethod-jl-v0-4/110604),
     it is more stable than ARPACK.
@@ -159,17 +151,17 @@ Post 1.0:
   - [Templates for the Solution of Algebraic Eigenvalue Problems: a Practical
   Guide](https://www.netlib.org/utk/people/JackDongarra/etemplates/book.html).
   Overview on numerical methods for eigen values, including dense and sparse
-    - [A shifted block Lanczos algorithm for solving sparse symmetric generalized eigenproblems.](https://www.nas.nasa.gov/assets/nas/pdf/techreports/1991/rnr-91-012.pdf)
-    - [Applied Numerical Linear Algebra](http://www.stat.uchicago.edu/~lekheng/courses/302/demmel/)
-    - [Implicit application of polynomial filters in a k-step Arnoldi method](https://ntrs.nasa.gov/api/citations/19930004220/downloads/19930004220.pdf)
-      - [An Implicitly Restarted Lanczos Method for Large Symmetric
-      Eigenvalue Problems](http://etna.mcs.kent.edu/vol.2.1994/pp1-21.dir/pp1-21.ps):
-      a specialization of the implicit ARNOLDI to the hermitian operator case.
-    - [Thick-Restart Lanczos Method For Large Symmetric Eigen Values
-    Problems](https://sdm.lbl.gov/~kewu/ps/trlan-siam.pdf): a special case of
-    Krylov-Schur for Hermitian o perators
-    - [NUMERICAL METHODS FOR LARGE EIGENVALUE
-    PROBLEMS](https://www-users.cse.umn.edu/~saad/eig_book_2ndEd.pdf): 2nd
-    edition, only covers up to early 90ies techniques (explicit/implicit
-    restarted Arnoldi). It explains clearly deflation, locking and gives some
-    numerical examples that can be used as reference.
+  - [A shifted block Lanczos algorithm for solving sparse symmetric generalized eigenproblems.](https://www.nas.nasa.gov/assets/nas/pdf/techreports/1991/rnr-91-012.pdf)
+  - [Applied Numerical Linear Algebra](http://www.stat.uchicago.edu/~lekheng/courses/302/demmel/)
+  - [Implicit application of polynomial filters in a k-step Arnoldi method](https://ntrs.nasa.gov/api/citations/19930004220/downloads/19930004220.pdf)
+    - [An Implicitly Restarted Lanczos Method for Large Symmetric
+    Eigenvalue Problems](http://etna.mcs.kent.edu/vol.2.1994/pp1-21.dir/pp1-21.ps):
+    a specialization of the implicit ARNOLDI to the hermitian operator case.
+  - [Thick-Restart Lanczos Method For Large Symmetric Eigen Values
+  Problems](https://sdm.lbl.gov/~kewu/ps/trlan-siam.pdf): a special case of
+  Krylov-Schur for Hermitian operators
+  - [NUMERICAL METHODS FOR LARGE EIGENVALUE
+  PROBLEMS](https://www-users.cse.umn.edu/~saad/eig_book_2ndEd.pdf): 2nd
+  edition, only covers up to early 1990s techniques (explicit/implicit
+  restarted Arnoldi). It explains clearly deflation, locking and gives some
+  numerical examples that can be used as reference.
