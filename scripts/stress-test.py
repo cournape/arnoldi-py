@@ -6,13 +6,14 @@ See the script plot-stress-test.py about plotting the results.
 """
 import argparse
 import csv
-import os.path
 import sys
+
+from pathlib import Path
 
 import numpy as np
 
-HERE = os.path.dirname(__file__)
-sys.path.insert(0, HERE)
+HERE = Path(__file__).parent
+sys.path.insert(0, str(HERE))
 
 from utils import (
     WHICH_TO_SORT, ConvergenceTracker, EigensolverParameters, Statistics,
@@ -42,9 +43,12 @@ def main():
         description="Compare partial_schur against ARPACK on a SuiteSparse matrix."
     )
     parser.add_argument("mat_file", help="Path to the .mat file (SuiteSparse format)")
-    parser.add_argument("-o", "--output-path", help="CSV Out path", default="output.csv")
+    parser.add_argument("-o", "--output-path", help="CSV Out path", default=None)
 
     args = parser.parse_args()
+
+    if args.output_path is None:
+        args.output_path = Path(args.mat_file).with_suffix(".csv")
 
     A_raw = load_suitesparse_mat(args.mat_file)
     n = A_raw.shape[0]
@@ -64,8 +68,11 @@ def main():
 
         for parameters in PARAMETERS:
             print(parameters)
+            print("Runing ARPACK ...")
             arpack_vals, arpack_vecs, arpack_stats = arpack_eig(A, parameters)
+            print("Runing Krylov-Schur ...")
             ps_vals, ps_vecs, ps_stats = arnoldi_py_eig(A, parameters)
+            print("Runing SLEPc ...")
             slepc_vals, slepc_vecs, slepc_stats = slepc_eig(A, parameters, tracker)
 
             print(f"\n--- Perf comparison ---")
