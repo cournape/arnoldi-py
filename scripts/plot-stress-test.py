@@ -1,4 +1,4 @@
-# AI note: this script was generated using AI (claude code)
+# AI note: this script is entirely generated using AI (claude code)
 import sys
 
 import pandas as pd
@@ -18,27 +18,40 @@ order = sorted(df["triplet"].unique())
 x_positions = {t: i for i, t in enumerate(order)}
 x_labels = [str(t) for t in order]
 
-fig, axes = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
-
 metrics = [
     ("elapsed", "elapsed (s)"),
     ("matvecs", "matvecs"),
     ("restarts", "restarts"),
 ]
 
-for method, group in df.groupby("method"):
-    group = group.copy()
-    group["x"] = group["triplet"].map(x_positions)
-    group = group.sort_values("x")
-    for ax, (col, ylabel) in zip(axes, metrics):
-        ax.plot(group["x"], group[col], marker="o", label=method, linewidth=2, markersize=7)
+which_values = sorted(df["which"].unique())
+n_rows = len(metrics)
+n_cols = len(which_values)
 
-for ax, (_, ylabel) in zip(axes, metrics):
-    ax.set_ylabel(ylabel)
+fig, axes = plt.subplots(n_rows, n_cols, figsize=(6 * n_cols, 3 * n_rows), sharex=True)
 
-axes[0].legend()
-axes[-1].set_xticks(range(len(order)))
-axes[-1].set_xticklabels(x_labels, rotation=45, ha="right")
-axes[-1].set_xlabel("(nev, ncv, p)")
+# Ensure axes is always 2D
+if n_cols == 1:
+    axes = axes[:, None]
+
+for col_idx, which in enumerate(which_values):
+    df_which = df[df["which"] == which]
+    for method, group in df_which.groupby("method"):
+        group = group.copy()
+        group["x"] = group["triplet"].map(x_positions)
+        group = group.sort_values("x")
+        for row_idx, (metric, _) in enumerate(metrics):
+            ax = axes[row_idx, col_idx]
+            ax.plot(group["x"], group[metric], marker="o", label=method, linewidth=2, markersize=7)
+
+    axes[0, col_idx].set_title(f"which={which}")
+    axes[-1, col_idx].set_xticks(range(len(order)))
+    axes[-1, col_idx].set_xticklabels(x_labels, rotation=45, ha="right")
+    axes[-1, col_idx].set_xlabel("(nev, ncv, p)")
+
+for row_idx, (_, ylabel) in enumerate(metrics):
+    axes[row_idx, 0].set_ylabel(ylabel)
+
+axes[0, 0].legend()
 fig.tight_layout()
 plt.show()

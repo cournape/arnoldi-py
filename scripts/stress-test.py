@@ -25,14 +25,17 @@ TOL = 1e-8
 MAX_RESTARTS = 100_000
 WHICH = "LR"
 
-PARAMETERS = [
-    EigensolverParameters(3, 20, TOL, MAX_RESTARTS, 10, WHICH),
-    EigensolverParameters(10, 20, TOL, MAX_RESTARTS, 16, WHICH),
-    EigensolverParameters(6, 20, TOL, MAX_RESTARTS, 12, WHICH),
-    EigensolverParameters(12, 30, TOL, MAX_RESTARTS, 21, WHICH),
-    EigensolverParameters(20, 40, TOL, MAX_RESTARTS, 30, WHICH),
-    #EigensolverParameters(6, 20, TOL, MAX_RESTARTS, 19, WHICH),
-]
+PARAMETERS = []
+for WHICH in ["LM", "LR"]:
+    PARAMETERS.extend([
+        EigensolverParameters(3, 20, TOL, MAX_RESTARTS, 10, WHICH),
+        EigensolverParameters(10, 20, TOL, MAX_RESTARTS, 16, WHICH),
+        EigensolverParameters(6, 20, TOL, MAX_RESTARTS, 12, WHICH),
+        EigensolverParameters(12, 30, TOL, MAX_RESTARTS, 21, WHICH),
+        EigensolverParameters(20, 40, TOL, MAX_RESTARTS, 30, WHICH),
+        EigensolverParameters(30, 50, TOL, MAX_RESTARTS, 40, WHICH),
+        EigensolverParameters(50, 80, TOL, MAX_RESTARTS, 40, WHICH),
+    ])
 
 def main():
     parser = argparse.ArgumentParser(
