@@ -1,5 +1,6 @@
 # AI note: this script is entirely generated using AI (claude code)
 import sys
+from pathlib import Path
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -11,7 +12,10 @@ if len(sys.argv) != 2:
     print(f"Usage: {sys.argv[0]} <csv_file>")
     sys.exit(1)
 
-df = pd.read_csv(sys.argv[1])
+csv_path = Path(sys.argv[1])
+matrix_name = csv_path.stem
+
+df = pd.read_csv(csv_path)
 
 df["triplet"] = list(zip(df["nev"], df["ncv"], df["p"]))
 order = sorted(df["triplet"].unique())
@@ -53,5 +57,6 @@ for row_idx, (_, ylabel) in enumerate(metrics):
     axes[row_idx, 0].set_ylabel(ylabel)
 
 axes[0, 0].legend()
+fig.suptitle(matrix_name)
 fig.tight_layout()
 plt.show()
