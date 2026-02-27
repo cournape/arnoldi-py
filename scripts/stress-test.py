@@ -30,12 +30,14 @@ PARAMETERS = []
 for WHICH in ["LM", "LR"]:
     PARAMETERS.extend([
         EigensolverParameters(3, 20, TOL, MAX_RESTARTS, 10, WHICH),
-        EigensolverParameters(10, 20, TOL, MAX_RESTARTS, 16, WHICH),
         EigensolverParameters(6, 20, TOL, MAX_RESTARTS, 12, WHICH),
+        EigensolverParameters(10, 20, TOL, MAX_RESTARTS, 16, WHICH),
         EigensolverParameters(12, 30, TOL, MAX_RESTARTS, 21, WHICH),
         EigensolverParameters(20, 40, TOL, MAX_RESTARTS, 30, WHICH),
         EigensolverParameters(30, 50, TOL, MAX_RESTARTS, 40, WHICH),
-        EigensolverParameters(50, 80, TOL, MAX_RESTARTS, 40, WHICH),
+        EigensolverParameters(50, 80, TOL, MAX_RESTARTS, 65, WHICH),
+        EigensolverParameters(50, 100, TOL, MAX_RESTARTS, 75, WHICH),
+        EigensolverParameters(75, 100, TOL, MAX_RESTARTS, 85, WHICH),
     ])
 
 def main():
