@@ -102,21 +102,29 @@ will contain a header mentioning this.
 
 For a first 1.0 release:
 
-- [ ] Fundamental support for arbitrary matrices, largest eigen values only
+- [x] Fundamental support for arbitrary matrices, largest eigen values only
   - [x] basic arnoldi decomp w/ tests
   - [x] add a key set of test matrices, using sparse matrix suite + synthetic
       (Markov, Laplace, etc.)
   - [x] convergence tracking on Ritz values
   - [x] explicit restart support with deflation
   - [x] Krylov-schur method
-  - [ ] More robust convergence criteria (relative/absolute/A norm)
   - [x] customizable orthonormalization
-- [ ] Compare performance w/ ARPACK in terms of #matvecs and runtime
+- [ ] Try to reach parity w/ ARPACK within 2x speed/memory usage
   - [x] compare MGS vs double GS w/ DGKS vs others in terms of precision
-  - [ ] implement locking and dynamic p
-  - [ ] handle happy breakdown in Krylov-Schur
+  - [ ] implement scenario loading from csv
+  - [ ] implement dynamic p
+  - [ ] implement locking
+  - [ ] implement time spend tracking in our implementation / SLEPCs and
+  profiling support for scipy eigs (ARPACK)
 - [ ] add support for calculation in real space for real matrices
-- [ ] LinearOperator support
+- [ ] Simple to add
+  - [ ] LinearOperator support -> enable SHIFT/Inverse mode (S* and sigma
+  support)
+  - [ ] handle happy breakdown in Krylov-Schur
+  - [ ] Customizable convergence support + 2 implementations (currnet + mix
+  relative/absolute ala ArnoldiMethod)
+  - [ ] Single precision ?
 
 Post 1.0:
 
