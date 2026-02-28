@@ -89,6 +89,13 @@ def main():
     print_residuals("SLEPC", A, vals, vecs)
     print("--- Perf comparison --")
     print(f"  SLEPC: {stats.matvecs} matvecs in {stats.restarts} iterations  ({stats.elapsed:.2f}s)")
+    print("  SLEPc breakdown:")
+    print(f"    MatMult (A@x):        {stats.count_matvec}")
+    print(f"    STApply       :       {stats.count_st_apply}")
+    print(f"    BVOrthogonalizeCol:   {stats.count_ortho}")
+    print(f"    BVDotVec (V^H@w):     {stats.count_dot}")
+    print(f"    BVMultVec (w-=V*c):   {stats.count_multivec}")
+    print(f"    DSSolve (restart):    {stats.count_ds_solve}")
 
 
 if __name__ == "__main__":

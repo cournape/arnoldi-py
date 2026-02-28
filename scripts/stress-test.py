@@ -16,8 +16,8 @@ HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE))
 
 from utils import (
-    WHICH_TO_SORT, ConvergenceTracker, EigensolverParameters, Statistics,
-    arnoldi_py_eig, arpack_eig, arnoldi_py_eig, slepc_eig, find_best_matching,
+    WHICH_TO_SORT, ConvergenceTracker, EigensolverParameters,
+    arnoldi_py_eig, arpack_eig, slepc_eig, find_best_matching,
     load_suitesparse_mat, print_residuals
 )
 
@@ -81,6 +81,14 @@ def main():
             print(f"  ARPACK:        {arpack_stats.matvecs} matvecs in {arpack_stats.restarts} iterations  ({arpack_stats.elapsed:.2f}s)")
             print(f"  partial_schur: {ps_stats.matvecs} matvecs in {ps_stats.restarts} iterations  ({ps_stats.elapsed:.2f}s)")
             print(f"  SLEPC:         {slepc_stats.matvecs} matvecs in {slepc_stats.restarts} iterations  ({slepc_stats.elapsed:.2f}s)")
+            print(f"  SLEPc call counts:")
+            print(f"    MatMult:              {slepc_stats.count_matvec}")
+            print(f"    STApply (A@x):        {slepc_stats.count_st_apply}")
+            print(f"    BVOrthogonalizeCol:   {slepc_stats.count_ortho}")
+            print(f"    BVDotVec (V^H@w):     {slepc_stats.count_dot}")
+            print(f"    BVMultVec (w-=V*c):   {slepc_stats.count_multivec}")
+            print(f"    DSSolve (restart):    {slepc_stats.count_ds_solve}")
+            print(f"    DSVectors (restart):  {slepc_stats.count_ds_vectors}")
 
             x, y = find_best_matching(arpack_vals, ps_vals)
             try:

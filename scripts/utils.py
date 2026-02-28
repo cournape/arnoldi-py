@@ -14,6 +14,7 @@ from slepc4py import SLEPc
 from arnoldi.krylov_schur import partial_schur
 from arnoldi.utils import arg_largest_real, arg_largest_magnitude
 
+PETSc.Log.begin()
 
 WHICH_TO_SORT = {
     "LM": arg_largest_magnitude,
@@ -32,6 +33,48 @@ class Statistics:
     dtype: np.dtype = dataclasses.field(default_factory=lambda: np.dtype("complex128"))
     matvecs: int = 0
     restarts: int = 0
+
+
+# Maps PETSc/SLEPc event names to SLEPcStatistics field names.
+# Event names come from PetscLogEventRegister calls in SLEPc source (bvfunc.c, dsbasic.c, stfunc.c).
+# Note: "BVOrthogonalizeV" is the truncated (16-char) name for BV_OrthogonalizeVec,
+# fired by BVOrthogonalizeColumn — the per-step call in Krylov-Schur.
+# "BVOrthogonalize" (block) is only called once during initial basis setup.
+_LOG_EVENT_FIELDS = {
+    "MatMult":          "count_matvec",      # raw matrix-vector products
+    "STApply":          "count_st_apply",    # spectral transform apply (wraps A@x)
+    "BVOrthogonalizeV": "count_ortho",       # per-column ortho (every Arnoldi step)
+    "BVDotVec":         "count_dot",         # V^H @ w  (inside ortho)
+    "BVMultVec":        "count_multivec",    # w -= V*coeff  (inside ortho)
+    "BVNormVec":        "count_normvec",     # ||w||  (inside ortho)
+    "DSSolve":          "count_ds_solve",    # dense Schur decomp at restart
+    "DSVectors":        "count_ds_vectors",  # compute Schur vectors at restart
+}
+
+
+@dataclasses.dataclass
+class SLEPcStatistics(Statistics):
+    """Statistics from a SLEPc solve with per-event call counts."""
+    count_matvec: int = 0       # MatMult: raw matrix-vector products
+    count_st_apply: int = 0     # STApply: spectral transform (one per Arnoldi step)
+    count_ortho: int = 0        # BVOrthogonalizeV: per-column orthogonalization
+    count_dot: int = 0          # BVDotVec: dot products inside ortho
+    count_multivec: int = 0     # BVMultVec: vector updates inside ortho
+    count_normvec: int = 0      # BVNormVec: norms inside ortho
+    count_ds_solve: int = 0     # DSSolve: dense Schur decomposition at restart
+    count_ds_vectors: int = 0   # DSVectors: Schur vectors computed at restart
+
+
+def _snapshot_events() -> dict[str, int]:
+    """Return current cumulative call counts for each tracked PETSc/SLEPc event."""
+    snapshot = {}
+    for event_name in _LOG_EVENT_FIELDS:
+        try:
+            info = PETSc.Log.Event(event_name).getPerfInfo()
+            snapshot[event_name] = info.get("count", 0)
+        except Exception:
+            snapshot[event_name] = 0
+    return snapshot
 
 
 @dataclasses.dataclass
@@ -355,10 +398,11 @@ def slepc_eig(A, parameters: EigensolverParameters, tracker):
     A_shell, mv_ctx = wrap_with_matvec_counter(A_petsc)
 
     # ── Solve ───────────────────────────────────────────────────
+    before = _snapshot_events()
     t0 = time.perf_counter()
     results = solve_largest_real(
         A_shell,
-        k= parameters.nev,
+        k=parameters.nev,
         max_dim=parameters.ncv,
         tol=parameters.tol,
         max_it=parameters.max_restarts,
@@ -366,11 +410,19 @@ def slepc_eig(A, parameters: EigensolverParameters, tracker):
         tracker=tracker,
     )
     elapsed = time.perf_counter() - t0
+    after = _snapshot_events()
 
     matvecs = mv_ctx.matvecs
     restarts = tracker.history[-1]["iter"]
 
-    stats = Statistics(elapsed, np.dtype(PETSc.ScalarType), matvecs, restarts)
+    event_times = {name: after[name] - before[name] for name in _LOG_EVENT_FIELDS}
+    stats = SLEPcStatistics(
+        elapsed=elapsed,
+        dtype=np.dtype(PETSc.ScalarType),
+        matvecs=matvecs,
+        restarts=restarts,
+        **{field: event_times[name] for name, field in _LOG_EVENT_FIELDS.items()},
+    )
 
     A_shell.destroy()
     A_petsc.destroy()
