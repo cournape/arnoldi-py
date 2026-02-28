@@ -10,9 +10,8 @@ import scipy.io
 import scipy.sparse as sp
 
 from scipy.linalg import toeplitz
-from scipy.sparse.linalg import eigs, LinearOperator
+from scipy.sparse.linalg import LinearOperator
 
-from arnoldi.krylov_schur import partial_schur
 from arnoldi.utils import arg_largest_magnitude, arg_largest_real
 
 
@@ -20,8 +19,8 @@ HERE = os.path.dirname(__file__)
 sys.path.insert(0, HERE)
 
 from utils import (
-    WHICH_TO_SORT, MatvecCounter, find_best_matching, load_suitesparse_mat,
-    print_residuals
+    WHICH_TO_SORT, EigensolverParameters, MatvecCounter, arnoldi_py_eig, arpack_eig,
+    find_best_matching, load_suitesparse_mat, print_residuals
 )
 
 
@@ -108,95 +107,51 @@ def main():
     # complex types, so we cast both solvers to the same dtype.
     A = A_raw.astype(np.complex128)
 
-    max_dim = args.max_dim if args.max_dim is not None else min(max(2 * nev + 1, 20), n)
-
+    parameters = EigensolverParameters.from_cli_args(args, n)
+    parameters.p = p
     print(f"Matrix: {args.mat_file}")
     print(f"  shape={n}x{n}, nnz={nnz}, dtype={A.dtype}")
-    print(
-        f"  nev={nev}, tol={tol}, max_dim={max_dim}, "
-        f"max_restarts={max_it}, which={which}"
-    )
+    print(parameters)
 
     # ------------------------------------------------------------------
     # ARPACK
     # ------------------------------------------------------------------
     print(f"\n--- Running ARPACK ---")
-    arpack_counter = MatvecCounter(A)
-    t0 = time.perf_counter()
-    arpack_vals, arpack_vecs = eigs(
-        arpack_counter,
-        k=nev,
-        which=which,
-        ncv=max_dim,
-        tol=tol,
-        maxiter=max_it,
-    )
-    arpack_elapsed = time.perf_counter() - t0
-
-    # Sort by descending real part for consistent display
-    idx = np.argsort(-arpack_vals.real)
-    arpack_vals = arpack_vals[idx]
-    arpack_vecs = arpack_vecs[:, idx]
-
-    matvecs = arpack_counter.matvecs
-    n_iters = (matvecs - max_dim) // (max_dim - nev)
-    print(f"  matvecs={arpack_counter.matvecs}, elapsed={arpack_elapsed:.2f}s for {n_iters} iterations")
+    arpack_vals, arpack_vecs, arpack_stats = arpack_eig(A, parameters)
+    print(f"  matvecs={arpack_stats.matvecs}, elapsed={arpack_stats.elapsed:.2f}s for {arpack_stats.restarts} iterations")
 
     # ------------------------------------------------------------------
     # partial_schur
     # ------------------------------------------------------------------
-    print(f"\n--- Running partial_schur (p = {p}) ---")
-    ps_counter = MatvecCounter(A)
-    t0 = time.perf_counter()
-    pQ, pT, history = partial_schur(
-        ps_counter,
-        nev,
-        max_dim=max_dim,
-        stopping_criterion=tol,
-        max_restarts=max_it,
-        sort_function=sort_function,
-        p=p,
-    )
-    ps_elapsed = time.perf_counter() - t0
-
-    # Extract eigenpairs from the partial Schur form
-    ps_eig_vals, S = np.linalg.eig(pT)
-    ps_eig_vecs = pQ @ S
-
-    idx = np.argsort(-ps_eig_vals.real)
-    ps_eig_vals = ps_eig_vals[idx]
-    ps_eig_vecs = ps_eig_vecs[:, idx]
-
-    ps_matvecs = int(np.max(history.matvecs))
-    n_iters = np.max(history.restarts)
-    print(f"  matvecs={ps_matvecs}, elapsed={ps_elapsed:.2f}s")
-    print(f"  matvecs={ps_matvecs}, elapsed={ps_elapsed:.2f}s for {n_iters} iterations")
+    print(f"\n--- Running partial_schur (p = {parameters.p}) ---")
+    ps_vals, ps_vecs, ps_stats = arnoldi_py_eig(A, parameters)
+    print(f"  matvecs={ps_stats.matvecs}, elapsed={ps_stats.elapsed:.2f}s for {ps_stats.restarts} iterations")
 
     # ------------------------------------------------------------------
     # True residuals
     # ------------------------------------------------------------------
     print_residuals("ARPACK", A, arpack_vals, arpack_vecs)
-    print_residuals("partial_schur", A, ps_eig_vals, ps_eig_vecs)
+    print_residuals("partial_schur", A, ps_vals, ps_vecs)
 
     # ------------------------------------------------------------------
     # Matvec comparison
     # ------------------------------------------------------------------
-    arpack_mv = arpack_counter.matvecs
-    pct = (ps_matvecs - arpack_mv) / arpack_mv * 100
+    arpack_matvecs = arpack_stats.matvecs
+    ps_matvecs = ps_stats.matvecs
+    pct = (ps_matvecs - arpack_matvecs) / arpack_matvecs * 100
     direction = "more" if pct >= 0 else "fewer"
 
-    print(f"\n--- Matvec comparison ---")
-    print(f"  ARPACK:        {arpack_mv} matvecs  ({arpack_elapsed:.2f}s)")
-    print(f"  partial_schur: {ps_matvecs} matvecs  ({ps_elapsed:.2f}s)")
+    print(f"\n--- Perf comparison ---")
+    print(f"  ARPACK:        {arpack_matvecs} matvecs in {arpack_stats.restarts} iterations  ({arpack_stats.elapsed:.2f}s)")
+    print(f"  partial_schur: {ps_matvecs} matvecs in {ps_stats.restarts} iterations  ({ps_stats.elapsed:.2f}s)")
     print(f"  partial_schur uses {abs(pct):.1f}% {direction} matvecs than ARPACK")
-    print(history)
 
-    print(arpack_vals)
-    print(ps_eig_vals)
+    # print(arpack_vals)
+    # print(ps_vals)
 
     # Ensure the eigenvalues match. This check + ensure normalized residuals
     # are close to 0 should be enough to ensure the output is correct.
-    x, y = find_best_matching(arpack_vals, ps_eig_vals)
+    x, y = find_best_matching(arpack_vals, ps_vals)
     np.testing.assert_allclose(x, y, rtol=tol)
 
 
