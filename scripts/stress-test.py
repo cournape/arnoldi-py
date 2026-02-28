@@ -24,21 +24,6 @@ from utils import (
 
 TOL = 1e-8
 MAX_RESTARTS = 100_000
-WHICH = "LR"
-
-PARAMETERS = []
-for WHICH in ["LM", "LR"]:
-    PARAMETERS.extend([
-        EigensolverParameters(3, 20, TOL, MAX_RESTARTS, 10, WHICH),
-        EigensolverParameters(6, 20, TOL, MAX_RESTARTS, 12, WHICH),
-        EigensolverParameters(10, 20, TOL, MAX_RESTARTS, 16, WHICH),
-        EigensolverParameters(12, 30, TOL, MAX_RESTARTS, 21, WHICH),
-        EigensolverParameters(20, 40, TOL, MAX_RESTARTS, 30, WHICH),
-        EigensolverParameters(30, 50, TOL, MAX_RESTARTS, 40, WHICH),
-        EigensolverParameters(50, 80, TOL, MAX_RESTARTS, 65, WHICH),
-        EigensolverParameters(50, 100, TOL, MAX_RESTARTS, 75, WHICH),
-        EigensolverParameters(75, 100, TOL, MAX_RESTARTS, 85, WHICH),
-    ])
 
 def main():
     parser = argparse.ArgumentParser(
@@ -46,11 +31,43 @@ def main():
     )
     parser.add_argument("mat_file", help="Path to the .mat file (SuiteSparse format)")
     parser.add_argument("-o", "--output-path", help="CSV Out path", default=None)
+    parser.add_argument("-p", "--parameters-path", help="CSV of parameters", default=None)
 
     args = parser.parse_args()
 
     if args.output_path is None:
         args.output_path = Path(args.mat_file).with_suffix(".csv")
+
+    if args.parameters_path is None:
+        parameters_list = []
+        for which in ["LM", "LR"]:
+            parameters_list.extend([
+                EigensolverParameters(10, 20, TOL, MAX_RESTARTS, 16, which),
+                EigensolverParameters(12, 30, TOL, MAX_RESTARTS, 21, which),
+                EigensolverParameters(20, 40, TOL, MAX_RESTARTS, 30, which),
+                EigensolverParameters(30, 50, TOL, MAX_RESTARTS, 40, which),
+                EigensolverParameters(35, 80, TOL, MAX_RESTARTS, 60, which),
+                EigensolverParameters(45, 100, TOL, MAX_RESTARTS, 70, which),
+            ])
+    else:
+        def decomment(fp):
+            for line in fp:
+                if not line.startswith("#"):
+                    yield line
+
+        with open(args.parameters_path, "rt", newline="") as fp:
+            reader = csv.DictReader(decomment(fp))
+            parameters_list = [
+                EigensolverParameters(
+                    int(d["nev"]),
+                    int(d["ncv"]),
+                    float(d["tol"]),
+                    int(d["max_restarts"]),
+                    int(d["p"]),
+                    d["which"],
+                )
+                for d in reader
+            ]
 
     A_raw = load_suitesparse_mat(args.mat_file)
     n = A_raw.shape[0]
@@ -68,7 +85,7 @@ def main():
         writer = csv.DictWriter(fp, fieldnames=fieldnames)
         writer.writeheader()
 
-        for parameters in PARAMETERS:
+        for parameters in parameters_list:
             print(parameters)
             print("Runing ARPACK ...")
             arpack_vals, arpack_vecs, arpack_stats = arpack_eig(A, parameters)
@@ -88,7 +105,6 @@ def main():
             print(f"    BVDotVec (V^H@w):     {slepc_stats.count_dot}")
             print(f"    BVMultVec (w-=V*c):   {slepc_stats.count_multivec}")
             print(f"    DSSolve (restart):    {slepc_stats.count_ds_solve}")
-            print(f"    DSVectors (restart):  {slepc_stats.count_ds_vectors}")
 
             x, y = find_best_matching(arpack_vals, ps_vals)
             try:
