@@ -108,6 +108,7 @@ def main():
     A = A_raw.astype(np.complex128)
 
     parameters = EigensolverParameters.from_cli_args(args, n)
+    parameters.p = p
     print(f"Matrix: {args.mat_file}")
     print(f"  shape={n}x{n}, nnz={nnz}, dtype={A.dtype}")
     print(parameters)
