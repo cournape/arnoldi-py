@@ -17,8 +17,8 @@ sys.path.insert(0, str(HERE))
 
 from utils import (
     WHICH_TO_SORT, ConvergenceTracker, EigensolverParameters,
-    arnoldi_py_eig, arpack_eig, slepc_eig, find_best_matching,
-    load_suitesparse_mat, print_residuals
+    arnoldi_py_eig, arpack_eig, assert_allclose_conjugate, slepc_eig,
+    find_best_matching, load_suitesparse_mat, print_residuals
 )
 
 
@@ -108,7 +108,7 @@ def main():
 
             x, y = find_best_matching(arpack_vals, ps_vals)
             try:
-                np.testing.assert_allclose(y, x, rtol=parameters.tol)
+                assert_allclose_conjugate(y, x, rtol=parameters.tol)
                 match = True
             except AssertionError as e:
                 match = False
