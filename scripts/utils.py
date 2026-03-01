@@ -257,40 +257,40 @@ class ConvergenceTracker:
                 f"  iter {its:4d} | nconv {nconv:3d} | errs [{err_str}]"
             )
 
-        # Query the DS object for its current dimensions.
-        # After truncation:
-        #   n = k + l (the truncated size, i.e. restart subspace size)
-        #   l_ds = number of locked columns (= k in locking, 0 in non-locking)
-        #   t = previous dimension before truncation (= nv)
-        ds = eps.getDS()
-        # getDimensions values
-        # n: the current size
-        # l: number of locked (inactive) leading columns
-        # k: intermediate dimension (e.g., position of arrow)
-        # t: truncated length
-        # NO LOCKING case
-        # - l = 0
-        n, l, k, t = ds.getDimensions()
-
-        nev, ncv, mpd = eps.getDimensions()
-
-        # Ensure the assumptions related to no-locking case
-        assert l == 0
-        assert ncv == t
-        assert n == k
-        assert mpd == ncv
-
-        # Next iteration's Arnoldi will start at n_ds, end at:
-        next_arnoldi_end = min(l + mpd, ncv)
-        assert next_arnoldi_end == ncv
-
-        if its % 100 == 1:
-            print(f"  iter {its:4d} | nconv {nconv:3d} | nev={nev:3d} p={n:3d} mpd={mpd:3d} "
-                #f"DS(n={n}, k={k}, t={t})  "
-                f"next Arnoldi: [{n} .. {ncv}["
-            )
-
-
+        # # Query the DS object for its current dimensions.
+        # # After truncation:
+        # #   n = k + l (the truncated size, i.e. restart subspace size)
+        # #   l_ds = number of locked columns (= k in locking, 0 in non-locking)
+        # #   t = previous dimension before truncation (= nv)
+        # ds = eps.getDS()
+        # # getDimensions values
+        # # n: the current size
+        # # l: number of locked (inactive) leading columns
+        # # k: intermediate dimension (e.g., position of arrow)
+        # # t: truncated length
+        # # NO LOCKING case
+        # # - l = 0
+        # n, l, k, t = ds.getDimensions()
+        #
+        # nev, ncv, mpd = eps.getDimensions()
+        #
+        # # Ensure the assumptions related to no-locking case
+        # assert l == 0
+        # assert ncv == t
+        # assert n == k
+        # assert mpd == ncv
+        #
+        # # Next iteration's Arnoldi will start at n_ds, end at:
+        # next_arnoldi_end = min(l + mpd, ncv)
+        # assert next_arnoldi_end == ncv
+        #
+        # if its % 100 == 1:
+        #     print(f"  iter {its:4d} | nconv {nconv:3d} | nev={nev:3d} p={n:3d} mpd={mpd:3d} "
+        #         #f"DS(n={n}, k={k}, t={t})  "
+        #         f"next Arnoldi: [{n} .. {ncv}["
+        #     )
+        #
+        #
 def scipy_csr_to_petsc(A_scipy: sp.csr_matrix, comm) -> PETSc.Mat:
     """
     Convert a scipy CSR matrix to a PETSc AIJ matrix.
@@ -381,13 +381,13 @@ def solve_largest_real(
     # ── Problem definition ──────────────────────────────────────
     eps.setProblemType(SLEPc.EPS.ProblemType.NHEP)   # Non-Hermitian Eigenproblem
     eps.setType(SLEPc.EPS.Type.KRYLOVSCHUR)
-    eps.setKrylovSchurLocking(False)
-    bv = eps.getBV()
-    bv.setOrthogonalization(
-        otype=SLEPc.BV.OrthogType.CGS,
-        refine=SLEPc.BV.OrthogRefineType.ALWAYS,
-    )
-
+    eps.setKrylovSchurLocking(True)
+    # bv = eps.getBV()
+    # bv.setOrthogonalization(
+    #     otype=SLEPc.BV.OrthogType.CGS,
+    #     refine=SLEPc.BV.OrthogRefineType.ALWAYS,
+    # )
+    #
     # ── Subspace and convergence parameters ────────────────────
     eps.setDimensions(nev=k, ncv=max_dim)
     eps.setTolerances(tol=tol, max_it=max_it)

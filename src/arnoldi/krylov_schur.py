@@ -30,8 +30,7 @@ def partial_schur(
     # p is the size of the active size after compression. If None, use
     # "dynamic" p. In that case, we will use same logic as SLEPc:
     #   p = nconv + max(1, floor(max_dim - nconv) * keep)
-    if p is not None:
-        assert nev <= p < max_dim
+    p = None
     keep = 0.5
     if p is None:
         use_dynamic_p = True
@@ -39,6 +38,7 @@ def partial_schur(
         use_dynamic_p = False
         assert nev <= p < max_dim
 
+    assert p is None
     dtype = np.complex128
 
     # Using order=F significantly speeds up the cases where orthonormalization
@@ -118,6 +118,18 @@ def partial_schur(
         has_converged = happy_breakdown or n_converged >= nev
         if has_converged:
             break
+
+        ### Testing invariants
+        #
+        ## V[:, :p+1] is orthonormal
+        #G = V[:, :p+1].conj().T @ V[:, :p+1]
+        #assert np.linalg.norm(G - np.eye(p+1)) < tol
+        #
+        ## Krylov decomposition is true
+        #b = H[p, :p]
+        #R = A @ V[:, :p] - V[:, :p] @ H[:p, :p] - np.outer(V[:, p], b)
+        #if np.linalg.norm(R) > 2 * tol:
+        #    print(f"WARNING: iter={restart:4d} -> Krylov decomp res is {np.linalg.norm(R):.4g}")
 
         V_a, H_a, n_iter = arnoldi_decomposition(
             A, V, H, max_dim=max_dim, start_dim=p, invariant_tol=tol
