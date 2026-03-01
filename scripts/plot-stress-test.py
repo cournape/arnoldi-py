@@ -1,4 +1,5 @@
 # AI note: this script is entirely generated using AI (claude code)
+import argparse
 import sys
 from pathlib import Path
 
@@ -8,11 +9,12 @@ import seaborn as sns
 
 sns.set_theme(style="darkgrid", palette="tab10")
 
-if len(sys.argv) != 2:
-    print(f"Usage: {sys.argv[0]} <csv_file>")
-    sys.exit(1)
+parser = argparse.ArgumentParser()
+parser.add_argument("csv_file")
+parser.add_argument("-s", action="store_true", help="save plot to PNG instead of displaying")
+args = parser.parse_args()
 
-csv_path = Path(sys.argv[1])
+csv_path = Path(args.csv_file)
 matrix_name = csv_path.stem
 
 df = pd.read_csv(csv_path)
@@ -62,4 +64,9 @@ for row_idx, (_, ylabel) in enumerate(metrics):
 axes[0, 0].legend()
 fig.suptitle(matrix_name)
 fig.tight_layout()
-plt.show()
+if args.s:
+    png_path = csv_path.with_suffix(".png")
+    fig.savefig(png_path)
+    print(f"Saved to {png_path}")
+else:
+    plt.show()

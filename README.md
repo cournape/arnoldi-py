@@ -117,7 +117,8 @@ For a first 1.0 release:
   - [ ] implement locking
   - [ ] implement time spend tracking in our implementation / SLEPCs and
   profiling support for scipy eigs (ARPACK)
-- [ ] add support for calculation in real space for real matrices
+  - [ ] try alternative methods (e.g. FEAST) for cases SLEPC/ARPACK fail on
+  (e.g. olm5000 LR nev >= 22)
 - [ ] Simple to add
   - [ ] LinearOperator support -> enable SHIFT/Inverse mode (S* and sigma
   support)

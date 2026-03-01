@@ -22,18 +22,17 @@ Notes
 import argparse
 import os.path
 import sys
-import time
 
 import numpy as np
-import scipy.sparse as sp
 
-
+# ruff: noqa: E402
 HERE = os.path.dirname(__file__)
 sys.path.insert(0, HERE)
 
 from utils import (
-    WHICH_TO_SORT_SLEPC, ConvergenceTracker, EigensolverParameters, Statistics,
-    load_suitesparse_mat, slepc_eig, print_residuals,
+    WHICH_TO_SORT_SLEPC, ConvergenceTracker, EigensolverParameters,
+    find_best_matching, load_suitesparse_mat, slepc_eig, print_residuals,
+    arnoldi_py_eig,
 )
 
 
@@ -89,6 +88,27 @@ def main():
     print_residuals("SLEPC", A, vals, vecs)
     print("--- Perf comparison --")
     print(f"  SLEPC: {stats.matvecs} matvecs in {stats.restarts} iterations  ({stats.elapsed:.2f}s)")
+    print("  SLEPc breakdown:")
+    print(f"    MatMult (A@x):        {stats.count_matvec}")
+    print(f"    STApply       :       {stats.count_st_apply}")
+    print(f"    BVOrthogonalizeCol:   {stats.count_ortho}")
+    print(f"    BVDotVec (V^H@w):     {stats.count_dot}")
+    print(f"    BVMultVec (w-=V*c):   {stats.count_multivec}")
+    print(f"    DSSolve (restart):    {stats.count_ds_solve}")
+
+    print(f"\n--- Running partial_schur (p = {parameters.p}) ---")
+    ps_vals, ps_vecs, ps_stats = arnoldi_py_eig(A, parameters)
+    print(f"  matvecs={ps_stats.matvecs}, elapsed={ps_stats.elapsed:.2f}s for {ps_stats.restarts} iterations")
+    print_residuals("Krylov-Schur", A, ps_vals, ps_vecs)
+
+    print(f"\n--- Perf comparison ---")
+    print(f"  SLEPC:        {stats.matvecs} matvecs in {stats.restarts} iterations  ({stats.elapsed:.2f}s)")
+    print(f"  partial_schur: {ps_stats.matvecs} matvecs in {ps_stats.restarts} iterations  ({ps_stats.elapsed:.2f}s)")
+
+    # Ensure the eigenvalues match. This check + ensure normalized residuals
+    # are close to 0 should be enough to ensure the output is correct.
+    x, y = find_best_matching(vals, ps_vals)
+    np.testing.assert_allclose(x, y, rtol=args.tol)
 
 
 if __name__ == "__main__":

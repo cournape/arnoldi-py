@@ -16,29 +16,14 @@ HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE))
 
 from utils import (
-    WHICH_TO_SORT, ConvergenceTracker, EigensolverParameters, Statistics,
-    arnoldi_py_eig, arpack_eig, arnoldi_py_eig, slepc_eig, find_best_matching,
+    WHICH_TO_SORT, ConvergenceTracker, EigensolverParameters,
+    arnoldi_py_eig, arpack_eig, slepc_eig, find_best_matching,
     load_suitesparse_mat, print_residuals
 )
 
 
 TOL = 1e-8
 MAX_RESTARTS = 100_000
-WHICH = "LR"
-
-PARAMETERS = []
-for WHICH in ["LM", "LR"]:
-    PARAMETERS.extend([
-        EigensolverParameters(3, 20, TOL, MAX_RESTARTS, 10, WHICH),
-        EigensolverParameters(6, 20, TOL, MAX_RESTARTS, 12, WHICH),
-        EigensolverParameters(10, 20, TOL, MAX_RESTARTS, 16, WHICH),
-        EigensolverParameters(12, 30, TOL, MAX_RESTARTS, 21, WHICH),
-        EigensolverParameters(20, 40, TOL, MAX_RESTARTS, 30, WHICH),
-        EigensolverParameters(30, 50, TOL, MAX_RESTARTS, 40, WHICH),
-        EigensolverParameters(50, 80, TOL, MAX_RESTARTS, 65, WHICH),
-        EigensolverParameters(50, 100, TOL, MAX_RESTARTS, 75, WHICH),
-        EigensolverParameters(75, 100, TOL, MAX_RESTARTS, 85, WHICH),
-    ])
 
 def main():
     parser = argparse.ArgumentParser(
@@ -46,11 +31,43 @@ def main():
     )
     parser.add_argument("mat_file", help="Path to the .mat file (SuiteSparse format)")
     parser.add_argument("-o", "--output-path", help="CSV Out path", default=None)
+    parser.add_argument("-p", "--parameters-path", help="CSV of parameters", default=None)
 
     args = parser.parse_args()
 
     if args.output_path is None:
         args.output_path = Path(args.mat_file).with_suffix(".csv")
+
+    if args.parameters_path is None:
+        parameters_list = []
+        for which in ["LM", "LR"]:
+            parameters_list.extend([
+                EigensolverParameters(10, 20, TOL, MAX_RESTARTS, 16, which),
+                EigensolverParameters(12, 30, TOL, MAX_RESTARTS, 21, which),
+                EigensolverParameters(20, 40, TOL, MAX_RESTARTS, 30, which),
+                EigensolverParameters(30, 50, TOL, MAX_RESTARTS, 40, which),
+                EigensolverParameters(35, 80, TOL, MAX_RESTARTS, 60, which),
+                EigensolverParameters(45, 100, TOL, MAX_RESTARTS, 70, which),
+            ])
+    else:
+        def decomment(fp):
+            for line in fp:
+                if not line.startswith("#"):
+                    yield line
+
+        with open(args.parameters_path, "rt", newline="") as fp:
+            reader = csv.DictReader(decomment(fp))
+            parameters_list = [
+                EigensolverParameters(
+                    int(d["nev"]),
+                    int(d["ncv"]),
+                    float(d["tol"]),
+                    int(d["max_restarts"]),
+                    int(d["p"]),
+                    d["which"],
+                )
+                for d in reader
+            ]
 
     A_raw = load_suitesparse_mat(args.mat_file)
     n = A_raw.shape[0]
@@ -68,7 +85,7 @@ def main():
         writer = csv.DictWriter(fp, fieldnames=fieldnames)
         writer.writeheader()
 
-        for parameters in PARAMETERS:
+        for parameters in parameters_list:
             print(parameters)
             print("Runing ARPACK ...")
             arpack_vals, arpack_vecs, arpack_stats = arpack_eig(A, parameters)
@@ -81,6 +98,13 @@ def main():
             print(f"  ARPACK:        {arpack_stats.matvecs} matvecs in {arpack_stats.restarts} iterations  ({arpack_stats.elapsed:.2f}s)")
             print(f"  partial_schur: {ps_stats.matvecs} matvecs in {ps_stats.restarts} iterations  ({ps_stats.elapsed:.2f}s)")
             print(f"  SLEPC:         {slepc_stats.matvecs} matvecs in {slepc_stats.restarts} iterations  ({slepc_stats.elapsed:.2f}s)")
+            print(f"  SLEPc call counts:")
+            print(f"    MatMult:              {slepc_stats.count_matvec}")
+            print(f"    STApply (A@x):        {slepc_stats.count_st_apply}")
+            print(f"    BVOrthogonalizeCol:   {slepc_stats.count_ortho}")
+            print(f"    BVDotVec (V^H@w):     {slepc_stats.count_dot}")
+            print(f"    BVMultVec (w-=V*c):   {slepc_stats.count_multivec}")
+            print(f"    DSSolve (restart):    {slepc_stats.count_ds_solve}")
 
             x, y = find_best_matching(arpack_vals, ps_vals)
             try:
