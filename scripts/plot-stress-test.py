@@ -43,7 +43,7 @@ if n_cols == 1:
 
 for col_idx, which in enumerate(which_values):
     df_which = df[df["which"] == which]
-    arpack_elapsed = df_which[df_which["method"] == "arpack"].set_index("triplet")["elapsed"]
+    arpack_elapsed = df_which[df_which["method"] == "arpack"].groupby("triplet")["elapsed"].mean()
     for method, group in df_which.groupby("method"):
         group = group.copy()
         group["elapsed_ratio"] = group["elapsed"].values / group["triplet"].map(arpack_elapsed)
