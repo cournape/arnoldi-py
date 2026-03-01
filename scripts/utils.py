@@ -386,16 +386,19 @@ def solve_largest_real(
     results = []
     vr, vi = A_petsc.createVecs()
     for i in range(eps.getConverged()):
-        k = eps.getEigenpair(i, vr, vi)
+        val = eps.getEigenpair(i, vr, vi)
         error  = eps.computeError(i, SLEPc.EPS.ErrorType.RELATIVE)
-        results.append((k, vr.getArray().copy(), error))
+        results.append((val, vr.getArray().copy(), error))
 
     # Sort by descending real part (SLEPc usually returns them sorted, but
     # the standard does not guarantee it)
     idx = WHICH_TO_SORT[which]([_[0] for _ in results])
-    results = [results[i] for i in idx]
+    # If more values converged than asked, all the converged values are
+    # returned, but we only want the top k for consistency w/ other solvers
+    results = [results[i] for i in idx[:k]]
 
     eps.destroy()
+
     return results
 
 
