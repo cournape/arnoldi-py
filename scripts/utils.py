@@ -224,7 +224,8 @@ def arnoldi_py_eig(A, parameters: EigensolverParameters):
     vals = vals[idx]
     vecs = vecs[:, idx]
 
-    matvecs = int(np.max(history.matvecs))
+    # FIXME: we are not using history.matvecs because the logic there is broken
+    matvecs = A.matvecs
     n_iters = np.max(history.restarts)
 
     return vals, vecs, Statistics(elapsed, A.dtype, matvecs, n_iters)
