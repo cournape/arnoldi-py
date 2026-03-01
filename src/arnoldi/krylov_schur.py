@@ -27,11 +27,17 @@ def partial_schur(
     if max_dim is None:
         max_dim = min(max(2 * nev + 1, 20), n)
 
-    # p is the size of the active size after compression
+    # p is the size of the active size after compression. If None, use
+    # "dynamic" p. In that case, we will use same logic as SLEPc:
+    #   p = nconv + max(1, floor(max_dim - nconv) * keep)
+    if p is not None:
+        assert nev <= p < max_dim
+    keep = 0.5
     if p is None:
-        p = min(nev + 5, max_dim - 1)
-
-    assert nev <= p < max_dim
+        use_dynamic_p = True
+    else:
+        use_dynamic_p = False
+        assert nev <= p < max_dim
 
     dtype = np.complex128
 
@@ -65,6 +71,29 @@ def partial_schur(
 
         T, Q = ordered_schur(H_active, output="complex", sort_function=sort_function)
 
+        ## Check convergence
+        approximate_residuals = np.abs(H_a[-1, -1] * Q[m-1, :])
+        approximate_convergence = approximate_residuals / np.abs(np.diag(T[:, :]))
+
+        for k in range(nev):
+            if approximate_convergence[k] <= tol:
+                history.matvecs[k] = matvecs
+                history.restarts[k] = restart + 1
+
+        n_converged = 0
+        for k in range(nev):
+            if approximate_convergence[k] > tol:
+                break
+            n_converged += 1
+
+        if use_dynamic_p:
+            p = n_converged + max(1, int(np.floor((max_dim - n_converged) * keep)))
+
+        if restart % 100 == 0:
+            print(f"  it={restart:3d} nconv={n_converged:3d} nev={nev:3d} p={p:3d} "
+                f"next Arnoldi: [{p} .. {max_dim}["
+            )
+
         ## Truncation
         Qp = Q[:, :p]
         Tp = T[:p, :p]
@@ -81,16 +110,12 @@ def partial_schur(
         H[p, :p] = old_coupling @ Qp
         H[p, p:] = 0 # Should be unecessary as those entries are not used in the next Arnoldi expansion
 
-        ## Check convergence
-        approximate_residuals = np.abs(H_a[-1, -1] * Q[m-1, :])
-        approximate_convergence = approximate_residuals / np.abs(np.diag(T[:, :]))
+        # Critical in the case p decreased, which may happen with dynamic p
+        # logic (p=None argument). We reset the old values as those are
+        # garbaged now
+        H[p+1:, :p] = 0
 
-        for k in range(nev):
-            if approximate_convergence[k] <= tol:
-                history.matvecs[k] = matvecs
-                history.restarts[k] = restart + 1
-
-        has_converged = happy_breakdown or np.all(approximate_convergence[:nev] < tol)
+        has_converged = happy_breakdown or n_converged >= nev
         if has_converged:
             break
 
