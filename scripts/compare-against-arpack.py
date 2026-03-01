@@ -2,7 +2,6 @@
 import argparse
 import os.path
 import sys
-import time
 
 import numpy as np
 
@@ -10,16 +9,14 @@ import scipy.io
 import scipy.sparse as sp
 
 from scipy.linalg import toeplitz
-from scipy.sparse.linalg import LinearOperator
-
-from arnoldi.utils import arg_largest_magnitude, arg_largest_real
 
 
 HERE = os.path.dirname(__file__)
 sys.path.insert(0, HERE)
 
+# ruff: noqa: E402
 from utils import (
-    WHICH_TO_SORT, EigensolverParameters, MatvecCounter, arnoldi_py_eig, arpack_eig,
+    WHICH_TO_SORT, EigensolverParameters, arnoldi_py_eig, arpack_eig,
     find_best_matching, load_suitesparse_mat, print_residuals
 )
 
