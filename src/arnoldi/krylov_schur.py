@@ -1,7 +1,5 @@
 import numpy as np
 
-from scipy.linalg import schur
-
 from .decomposition import arnoldi_decomposition
 from .explicit_restarts import History
 from .utils import arg_largest_magnitude, ordered_schur, rand_normalized_vector
@@ -65,15 +63,11 @@ def partial_schur(
         V_active = V_a[:, :m]
         H_active = H_a[:m, :m]
 
-        ## Rotation
-        T1, Q1 = schur(H_active, output="complex")
-        T2, Q2 = ordered_schur(T1, output="complex", sort_function=sort_function)
-
-        Q = Q1 @ Q2
+        T, Q = ordered_schur(H_active, output="complex", sort_function=sort_function)
 
         ## Truncation
         Qp = Q[:, :p]
-        Tp = T2[:p, :p]
+        Tp = T[:p, :p]
 
         V[:, :p] = V_active @ Qp
         # Not a typo: we copy the last vector of the non truncated orthonormal
@@ -87,9 +81,9 @@ def partial_schur(
         H[p, :p] = old_coupling @ Qp
         H[p, p:] = 0 # Should be unecessary as those entries are not used in the next Arnoldi expansion
 
-        # Check convergence
+        ## Check convergence
         approximate_residuals = np.abs(H_a[-1, -1] * Q[m-1, :])
-        approximate_convergence = approximate_residuals / np.abs(np.diag(T2[:, :]))
+        approximate_convergence = approximate_residuals / np.abs(np.diag(T[:, :]))
 
         for k in range(nev):
             if approximate_convergence[k] <= tol:
