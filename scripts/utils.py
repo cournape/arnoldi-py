@@ -8,6 +8,12 @@ import scipy.sparse as sp
 from scipy.optimize import linear_sum_assignment
 from scipy.sparse.linalg import LinearOperator, eigs
 
+# XXX: necessary to track some SLEPc details like truncation value
+# argv = ["-info", ":eps:"]
+#
+# import petsc4py
+# petsc4py.init(argv)
+
 from petsc4py import PETSc
 from slepc4py import SLEPc
 
@@ -244,12 +250,44 @@ class ConvergenceTracker:
             "evals":  list(evals),   # copy — SLEPc reuses the buffer
             "errors": list(errs),    # same
         })
-
         # Print a one-liner per iteration to stdout
-        if its % 100 == 99:
+        if its % 100 == 1:
             err_str = "  ".join(f"{e:.2e}" for e in errs[:4])  # show first 4
-            PETSc.Sys.Print(
+            print(
                 f"  iter {its:4d} | nconv {nconv:3d} | errs [{err_str}]"
+            )
+
+        # Query the DS object for its current dimensions.
+        # After truncation:
+        #   n = k + l (the truncated size, i.e. restart subspace size)
+        #   l_ds = number of locked columns (= k in locking, 0 in non-locking)
+        #   t = previous dimension before truncation (= nv)
+        ds = eps.getDS()
+        # getDimensions values
+        # n: the current size
+        # l: number of locked (inactive) leading columns
+        # k: intermediate dimension (e.g., position of arrow)
+        # t: truncated length
+        # NO LOCKING case
+        # - l = 0
+        n, l, k, t = ds.getDimensions()
+
+        nev, ncv, mpd = eps.getDimensions()
+
+        # Ensure the assumptions related to no-locking case
+        assert l == 0
+        assert ncv == t
+        assert n == k
+        assert mpd == ncv
+
+        # Next iteration's Arnoldi will start at n_ds, end at:
+        next_arnoldi_end = min(l + mpd, ncv)
+        assert next_arnoldi_end == ncv
+
+        if its % 100 == 1:
+            print(f"  iter {its:4d} | nconv {nconv:3d} | nev={nev:3d} p={n:3d} mpd={mpd:3d} "
+                #f"DS(n={n}, k={k}, t={t})  "
+                f"next Arnoldi: [{n} .. {ncv}["
             )
 
 
