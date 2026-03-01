@@ -334,16 +334,22 @@ def solve_largest_real(
 
     eps = SLEPc.EPS().create(comm=A_petsc.getComm())
 
-    # ── Problem definition ──────────────────────────────────────
     eps.setOperators(A_petsc)
-    eps.setProblemType(SLEPc.EPS.ProblemType.NHEP)   # Non-Hermitian Eigenproblem
 
     # ── Which eigenvalues ───────────────────────────────────────
     mode = WHICH_TO_SORT_SLEPC[which]
     eps.setWhichEigenpairs(mode)
 
+    # ── Problem definition ──────────────────────────────────────
+    eps.setProblemType(SLEPc.EPS.ProblemType.NHEP)   # Non-Hermitian Eigenproblem
     eps.setType(SLEPc.EPS.Type.KRYLOVSCHUR)
-    #eps.setType(SLEPc.EPS.Type.ARNOLDI)
+    eps.setKrylovSchurLocking(False)
+    bv = eps.getBV()
+    bv.setOrthogonalization(
+        otype=SLEPc.BV.OrthogType.CGS,
+        refine=SLEPc.BV.OrthogRefineType.ALWAYS,
+    )
+
     # ── Subspace and convergence parameters ────────────────────
     eps.setDimensions(nev=k, ncv=max_dim)
     eps.setTolerances(tol=tol, max_it=max_it)
