@@ -112,7 +112,7 @@ For a first 1.0 release:
   - [x] customizable orthonormalization
 - [ ] Try to reach parity w/ ARPACK within 2x speed/memory usage
   - [x] compare MGS vs double GS w/ DGKS vs others in terms of precision
-  - [ ] implement scenario loading from csv
+  - [x] implement scenario loading from csv
   - [ ] implement dynamic p
   - [ ] implement locking
   - [ ] implement time spend tracking in our implementation / SLEPCs and
