@@ -113,8 +113,11 @@ For a first 1.0 release:
 - [ ] Try to reach parity w/ ARPACK within 2x speed/memory usage
   - [x] compare MGS vs double GS w/ DGKS vs others in terms of precision
   - [x] implement scenario loading from csv
-  - [ ] implement dynamic p
+  - [x] implement dynamic p
   - [ ] implement locking
+- [ ] Tracking capabilities
+  - [ ] callback setup to enable 1) tracking key operations and 2) track
+  invariants
   - [ ] implement time spend tracking in our implementation / SLEPCs and
   profiling support for scipy eigs (ARPACK)
   - [ ] try alternative methods (e.g. FEAST) for cases SLEPC/ARPACK fail on
