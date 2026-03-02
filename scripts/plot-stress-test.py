@@ -19,8 +19,8 @@ matrix_name = csv_path.stem
 
 df = pd.read_csv(csv_path)
 
-df["triplet"] = list(zip(df["nev"], df["ncv"], df["p"]))
-order = sorted(df["triplet"].unique())
+df["pair"] = list(zip(df["nev"], df["ncv"]))
+order = sorted(set(df["pair"]))
 x_positions = {t: i for i, t in enumerate(order)}
 x_labels = [str(t) for t in order]
 
@@ -43,11 +43,11 @@ if n_cols == 1:
 
 for col_idx, which in enumerate(which_values):
     df_which = df[df["which"] == which]
-    arpack_elapsed = df_which[df_which["method"] == "arpack"].set_index("triplet")["elapsed"]
+    arpack_elapsed = df_which[df_which["method"] == "arpack"].groupby("pair")["elapsed"].mean()
     for method, group in df_which.groupby("method"):
         group = group.copy()
-        group["elapsed_ratio"] = group["elapsed"].values / group["triplet"].map(arpack_elapsed)
-        group["x"] = group["triplet"].map(x_positions)
+        group["elapsed_ratio"] = group["elapsed"].values / group["pair"].map(arpack_elapsed)
+        group["x"] = group["pair"].map(x_positions)
         group = group.sort_values("x")
         for row_idx, (metric, _) in enumerate(metrics):
             ax = axes[row_idx, col_idx]
@@ -56,7 +56,7 @@ for col_idx, which in enumerate(which_values):
     axes[0, col_idx].set_title(f"which={which}")
     axes[-1, col_idx].set_xticks(range(len(order)))
     axes[-1, col_idx].set_xticklabels(x_labels, rotation=45, ha="right")
-    axes[-1, col_idx].set_xlabel("(nev, ncv, p)")
+    axes[-1, col_idx].set_xlabel("(nev, ncv)")
 
 for row_idx, (_, ylabel) in enumerate(metrics):
     axes[row_idx, 0].set_ylabel(ylabel)

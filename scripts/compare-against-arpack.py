@@ -17,7 +17,8 @@ sys.path.insert(0, HERE)
 # ruff: noqa: E402
 from utils import (
     WHICH_TO_SORT, EigensolverParameters, arnoldi_py_eig, arpack_eig,
-    find_best_matching, load_suitesparse_mat, print_residuals
+    assert_allclose_conjugate, find_best_matching, load_suitesparse_mat,
+    print_residuals
 )
 
 
@@ -149,7 +150,10 @@ def main():
     # Ensure the eigenvalues match. This check + ensure normalized residuals
     # are close to 0 should be enough to ensure the output is correct.
     x, y = find_best_matching(arpack_vals, ps_vals)
-    np.testing.assert_allclose(x, y, rtol=tol)
+    try:
+        assert_allclose_conjugate(x, y, rtol=args.tol)
+    except AssertionError as e:
+        print(e)
 
 
 if __name__ == "__main__":

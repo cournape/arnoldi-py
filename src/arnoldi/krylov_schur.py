@@ -27,11 +27,15 @@ def partial_schur(
     if max_dim is None:
         max_dim = min(max(2 * nev + 1, 20), n)
 
-    # p is the size of the active size after compression
+    # p is the size of the active size after compression. If None, use
+    # "dynamic" p. In that case, we will use same logic as SLEPc:
+    #   p = nconv + max(1, floor(max_dim - nconv) * keep)
+    keep = 0.5
     if p is None:
-        p = min(nev + 5, max_dim - 1)
-
-    assert nev <= p < max_dim
+        use_dynamic_p = True
+    else:
+        use_dynamic_p = False
+        assert nev <= p < max_dim
 
     dtype = np.complex128
 
@@ -65,6 +69,28 @@ def partial_schur(
 
         T, Q = ordered_schur(H_active, output="complex", sort_function=sort_function)
 
+        ## Check convergence
+        approximate_residuals = np.abs(H_a[-1, -1] * Q[m-1, :])
+        approximate_convergence = approximate_residuals / np.abs(np.diag(T[:, :]))
+
+        for k in range(nev):
+            if approximate_convergence[k] <= tol:
+                # FIXME: this logic is broken
+                history.matvecs[k] = matvecs
+                history.restarts[k] = restart + 1
+
+        n_converged = 0
+        for k in range(nev):
+            if approximate_convergence[k] > tol:
+                break
+            n_converged += 1
+
+        if use_dynamic_p:
+            p = n_converged + max(1, int(np.floor((max_dim - n_converged) * keep)))
+
+        # assert to shut up the type checker
+        assert p is not None
+
         ## Truncation
         Qp = Q[:, :p]
         Tp = T[:p, :p]
@@ -74,23 +100,17 @@ def partial_schur(
         # basis as the last vector of the truncated basis
         V[:, p] = V[:, m]
 
+        # Resetting H to 0 is critical in the case of synamic p w/o locking,
+        # as p may decrease between iterations  in this case. Without resetting
+        # to 0, Arnoldi decomposition would use some obsolete data, breaking
+        # the Arnoldi invariants.
+        old_coupling = H_a[-1, :m].copy()
+        H[:] = 0
+
         H[:p, :p] = Tp
-        # FIXME: there is a simplification possible as all entries of H_a[m, :]
-        # except one are supposed to be 0
-        old_coupling = H_a[-1, :m]
         H[p, :p] = old_coupling @ Qp
-        H[p, p:] = 0 # Should be unecessary as those entries are not used in the next Arnoldi expansion
 
-        ## Check convergence
-        approximate_residuals = np.abs(H_a[-1, -1] * Q[m-1, :])
-        approximate_convergence = approximate_residuals / np.abs(np.diag(T[:, :]))
-
-        for k in range(nev):
-            if approximate_convergence[k] <= tol:
-                history.matvecs[k] = matvecs
-                history.restarts[k] = restart + 1
-
-        has_converged = happy_breakdown or np.all(approximate_convergence[:nev] < tol)
+        has_converged = happy_breakdown or n_converged >= nev
         if has_converged:
             break
 

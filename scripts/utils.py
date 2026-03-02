@@ -150,9 +150,9 @@ def load_suitesparse_mat(path: str) -> sp.csr_matrix:
 
     # Try the SuiteSparse struct layout first
     prob = data.get("Problem")
-    if prob:
+    if prob is not None:
         # prob is a (1,1) structured array; the matrix lives at field 'A'
-        A = prob["A"][0, 0]
+        A = prob[0, 0]["A"]
         if sp.issparse(A):
             return A.tocsr()
 
@@ -380,16 +380,19 @@ def solve_largest_real(
     results = []
     vr, vi = A_petsc.createVecs()
     for i in range(eps.getConverged()):
-        k = eps.getEigenpair(i, vr, vi)
+        val = eps.getEigenpair(i, vr, vi)
         error  = eps.computeError(i, SLEPc.EPS.ErrorType.RELATIVE)
-        results.append((k, vr.getArray().copy(), error))
+        results.append((val, vr.getArray().copy(), error))
 
     # Sort by descending real part (SLEPc usually returns them sorted, but
     # the standard does not guarantee it)
     idx = WHICH_TO_SORT[which]([_[0] for _ in results])
-    results = [results[i] for i in idx]
+    # If more values converged than asked, all the converged values are
+    # returned, but we only want the top k for consistency w/ other solvers
+    results = [results[i] for i in idx[:k]]
 
     eps.destroy()
+
     return results
 
 
@@ -432,3 +435,29 @@ def slepc_eig(A, parameters: EigensolverParameters, tracker):
     vecs = np.array([_[1] for _ in results]).T
 
     return vals, vecs, stats
+
+
+def assert_allclose_conjugate(actual, desired, rtol=1e-7, atol=0):
+    """Like np.testing.assert_allclose but treats conjugate pairs as equal.
+
+    Useful when comparing eigen values between different implementations, as
+    conjugate pairs have same amplitude (LM), same real (LR).
+    """
+    actual = np.sort_complex(np.asarray(actual).ravel())
+    desired = np.sort_complex(np.asarray(desired).ravel())
+
+    # Try direct match first
+    diff = np.abs(actual - desired)
+    # Where it fails, try conjugate
+    conj_diff = np.abs(actual - desired.conj())
+    err = np.minimum(diff, conj_diff)
+
+    limit = atol + rtol * np.abs(desired)
+    if np.any(err > limit):
+        bad = np.where(err > limit)[0]
+        raise AssertionError(
+            f"Mismatch at indices {bad}:\n"
+            f"  actual:  {actual[bad]}\n"
+            f"  desired: {desired[bad]}\n"
+            f"  max err: {err[bad].max():.2e}"
+        )

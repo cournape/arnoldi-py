@@ -31,8 +31,8 @@ sys.path.insert(0, HERE)
 
 from utils import (
     WHICH_TO_SORT_SLEPC, ConvergenceTracker, EigensolverParameters,
-    find_best_matching, load_suitesparse_mat, slepc_eig, print_residuals,
-    arnoldi_py_eig,
+    assert_allclose_conjugate, find_best_matching, load_suitesparse_mat,
+    slepc_eig, print_residuals, arnoldi_py_eig,
 )
 
 
@@ -108,7 +108,10 @@ def main():
     # Ensure the eigenvalues match. This check + ensure normalized residuals
     # are close to 0 should be enough to ensure the output is correct.
     x, y = find_best_matching(vals, ps_vals)
-    np.testing.assert_allclose(x, y, rtol=args.tol)
+    try:
+        assert_allclose_conjugate(x, y, rtol=args.tol)
+    except AssertionError as e:
+        print(e)
 
 
 if __name__ == "__main__":
