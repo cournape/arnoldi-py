@@ -5,6 +5,7 @@ of parameters for a given matrix.
 See the script plot-stress-test.py about plotting the results.
 """
 import argparse
+import ast
 import csv
 import sys
 
@@ -32,6 +33,10 @@ def main():
     parser.add_argument("mat_file", help="Path to the .mat file (SuiteSparse format)")
     parser.add_argument("-o", "--output-path", help="CSV Out path", default=None)
     parser.add_argument("-p", "--parameters-path", help="CSV of parameters", default=None)
+    parser.add_argument(
+        "--p-mode", choices=["static", "dynamic", "both"], default="static",
+        help="Whether to run krylov-schur with static p, dynamic p (p=None), or both (default: static)",
+    )
 
     args = parser.parse_args()
 
@@ -63,7 +68,7 @@ def main():
                     int(d["ncv"]),
                     float(d["tol"]),
                     int(d["max_restarts"]),
-                    int(d["p"]),
+                    ast.literal_eval(d["p"]),
                     d["which"],
                 )
                 for d in reader
@@ -87,38 +92,61 @@ def main():
 
         for parameters in parameters_list:
             print(parameters)
-            print("Runing ARPACK ...")
+            print("Running ARPACK ...")
             arpack_vals, arpack_vecs, arpack_stats = arpack_eig(A, parameters)
-            print("Runing Krylov-Schur ...")
-            ps_vals, ps_vecs, ps_stats = arnoldi_py_eig(A, parameters)
-            print("Runing SLEPc ...")
+            print("Running SLEPc ...")
             slepc_vals, slepc_vecs, slepc_stats = slepc_eig(A, parameters, tracker)
 
-            print(f"\n--- Perf comparison ---")
-            print(f"  ARPACK:        {arpack_stats.matvecs} matvecs in {arpack_stats.restarts} iterations  ({arpack_stats.elapsed:.2f}s)")
-            print(f"  partial_schur: {ps_stats.matvecs} matvecs in {ps_stats.restarts} iterations  ({ps_stats.elapsed:.2f}s)")
-            print(f"  SLEPC:         {slepc_stats.matvecs} matvecs in {slepc_stats.restarts} iterations  ({slepc_stats.elapsed:.2f}s)")
-            print(f"  SLEPc call counts:")
-            print(f"    MatMult:              {slepc_stats.count_matvec}")
-            print(f"    STApply (A@x):        {slepc_stats.count_st_apply}")
-            print(f"    BVOrthogonalizeCol:   {slepc_stats.count_ortho}")
-            print(f"    BVDotVec (V^H@w):     {slepc_stats.count_dot}")
-            print(f"    BVMultVec (w-=V*c):   {slepc_stats.count_multivec}")
-            print(f"    DSSolve (restart):    {slepc_stats.count_ds_solve}")
+            # Determine which krylov-schur variants to run
+            ks_runs = []
+            if args.p_mode in ("static", "both"):
+                ks_runs.append(("krylov-schur-static", parameters))
+            if args.p_mode in ("dynamic", "both"):
+                dynamic_params = EigensolverParameters(
+                    parameters.nev, parameters.ncv, parameters.tol,
+                    parameters.max_restarts, None, parameters.which,
+                )
+                ks_runs.append(("krylov-schur-dynamic", dynamic_params))
 
-            x, y = find_best_matching(arpack_vals, ps_vals)
-            try:
-                assert_allclose_conjugate(y, x, rtol=parameters.tol)
-                match = True
-            except AssertionError as e:
-                match = False
-                print("\033[31m!!! ARPACK and Krylov-Schur don't match !!!\033[0m")
-                print(e)
+            for ks_method, ks_params in ks_runs:
+                print(f"Running {ks_method} ...")
+                ps_vals, ps_vecs, ps_stats = arnoldi_py_eig(A, ks_params)
 
-            print_residuals("ARPACK", A, arpack_vals, arpack_vecs)
-            print_residuals("Krylov-Schur", A, ps_vals, ps_vecs)
+                print(f"\n--- Perf comparison ({ks_method}) ---")
+                print(f"  ARPACK:        {arpack_stats.matvecs} matvecs in {arpack_stats.restarts} iterations  ({arpack_stats.elapsed:.2f}s)")
+                print(f"  {ks_method}:   {ps_stats.matvecs} matvecs in {ps_stats.restarts} iterations  ({ps_stats.elapsed:.2f}s)")
+                print(f"  SLEPc:         {slepc_stats.matvecs} matvecs in {slepc_stats.restarts} iterations  ({slepc_stats.elapsed:.2f}s)")
 
-            for method, stats in zip(["arpack", "krylov-schur", "slepc"], [arpack_stats, ps_stats, slepc_stats]):
+                x, y = find_best_matching(arpack_vals, ps_vals)
+                try:
+                    assert_allclose_conjugate(y, x, rtol=parameters.tol)
+                    match = True
+                except AssertionError as e:
+                    match = False
+                    print(f"\033[31m!!! ARPACK and {ks_method} don't match !!!\033[0m")
+                    print(e)
+
+                print_residuals("ARPACK", A, arpack_vals, arpack_vecs)
+                print_residuals(ks_method, A, ps_vals, ps_vecs)
+
+                row = {
+                    "method": ks_method,
+                    "dtype": ps_stats.dtype,
+                    "nev": parameters.nev,
+                    "ncv": parameters.ncv,
+                    "tol": parameters.tol,
+                    "max_restarts": parameters.max_restarts,
+                    "p": ks_params.p,
+                    "which": parameters.which,
+                    "elapsed": ps_stats.elapsed,
+                    "matvecs": ps_stats.matvecs,
+                    "restarts": ps_stats.restarts,
+                    "match": match,
+                }
+                writer.writerow(row)
+
+            # Write arpack and slepc rows (once per parameter set)
+            for method, stats in [("arpack", arpack_stats), ("slepc", slepc_stats)]:
                 row = {
                     "method": method,
                     "dtype": stats.dtype,
