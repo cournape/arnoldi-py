@@ -150,9 +150,9 @@ def load_suitesparse_mat(path: str) -> sp.csr_matrix:
 
     # Try the SuiteSparse struct layout first
     prob = data.get("Problem")
-    if prob:
+    if prob is not None:
         # prob is a (1,1) structured array; the matrix lives at field 'A'
-        A = prob["A"][0, 0]
+        A = prob[0, 0]["A"]
         if sp.issparse(A):
             return A.tocsr()
 
