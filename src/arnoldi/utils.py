@@ -21,6 +21,10 @@ def arg_largest_real(x):
     return np.argsort(-np.real(x))
 
 
+def arg_largest_imag(x):
+    return np.argsort(-np.imag(x))
+
+
 _TREXC_FUNCTION = {
     np.dtype("float32"): strexc,
     np.dtype("float64"): dtrexc,

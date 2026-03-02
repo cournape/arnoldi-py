@@ -12,18 +12,20 @@ from petsc4py import PETSc
 from slepc4py import SLEPc
 
 from arnoldi.krylov_schur import partial_schur
-from arnoldi.utils import arg_largest_real, arg_largest_magnitude
+from arnoldi.utils import arg_largest_real, arg_largest_magnitude, arg_largest_imag
 
 PETSc.Log.begin()
 
 WHICH_TO_SORT = {
     "LM": arg_largest_magnitude,
     "LR": arg_largest_real,
+    "LI": arg_largest_imag,
 }
 
 WHICH_TO_SORT_SLEPC = {
     "LM": SLEPc.EPS.Which.LARGEST_MAGNITUDE,
     "LR": SLEPc.EPS.Which.LARGEST_REAL,
+    "LI": SLEPc.EPS.Which.LARGEST_IMAGINARY,
 }
 
 
