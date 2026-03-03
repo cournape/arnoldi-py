@@ -73,6 +73,7 @@ def partial_schur(
         else:
             happy_breakdown = False
 
+        # FIXME: this logic is broken
         matvecs = restart * (max_dim - nev) + (m - nev)
 
         V_active = V_a[:, :m]
@@ -86,7 +87,6 @@ def partial_schur(
 
         for k in range(nev):
             if approximate_convergence[k] <= tol:
-                # FIXME: this logic is broken
                 history.matvecs[k] = matvecs
                 history.restarts[k] = restart + 1
 
@@ -98,7 +98,6 @@ def partial_schur(
 
         if use_dynamic_p:
             p = n_converged + max(1, int(np.floor((max_dim - n_converged) * keep)))
-
         # assert to shut up the type checker
         assert p is not None
 
@@ -111,7 +110,7 @@ def partial_schur(
         # basis as the last vector of the truncated basis
         V[:, p] = V[:, m]
 
-        # Resetting H to 0 is critical in the case of synamic p w/o locking,
+        # Resetting H to 0 is critical in the case of dynamic p w/o locking,
         # as p may decrease between iterations  in this case. Without resetting
         # to 0, Arnoldi decomposition would use some obsolete data, breaking
         # the Arnoldi invariants.
