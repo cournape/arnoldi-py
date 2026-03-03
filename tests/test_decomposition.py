@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import scipy.sparse as sp
 
-from arnoldi.decomposition import RitzDecomposition, arnoldi_decomposition
+from arnoldi.decomposition import RitzDecomposition, arnoldi_decompose
 from arnoldi.matrices import mark, laplace
 from arnoldi.utils import rand_normalized_vector
 
@@ -84,7 +84,7 @@ class TestArnoldiDecompositionFunction:
         V[:, 0] = rand_normalized_vector(n, dtype)
 
         ## When
-        Va, Ha, n_iter = arnoldi_decomposition(A, V, H, ATOL)
+        Va, Ha, n_iter = arnoldi_decompose(A, V, H, ATOL)
 
         ## Then
         assert_invariants(A, Va, Ha, n_iter)
@@ -105,7 +105,7 @@ class TestArnoldiDecompositionFunction:
         V[:, 0] = rand_normalized_vector(n, dtype)
 
         ## When
-        Va, Ha, n_iter = arnoldi_decomposition(A, V, H, ATOL, max_dim=max_dim)
+        Va, Ha, n_iter = arnoldi_decompose(A, V, H, ATOL, max_dim=max_dim)
 
         ## Then
         assert Va.shape == (n, max_dim+1)
@@ -129,7 +129,7 @@ class TestArnoldiDecompositionFunction:
         H = np.zeros((m+1, m), dtype=dtype)
         V[:, 0] = r_vecs[:, 0]
 
-        Vm, Hm, n_iter = arnoldi_decomposition(A, V, H, ATOL)
+        Vm, Hm, n_iter = arnoldi_decompose(A, V, H, ATOL)
 
         ## Then
         # Only one iteration is expected
@@ -159,7 +159,7 @@ class TestEigenValues:
         H = np.zeros((m+1, m), dtype)
 
         V[:, 0] = rand_normalized_vector(n, dtype)
-        V, H, _ = arnoldi_decomposition(A, V, H)
+        V, H, _ = arnoldi_decompose(A, V, H)
 
         ritz = RitzDecomposition.from_v_and_h(V, H, k)
 
@@ -181,7 +181,7 @@ class TestRitzDecomposition:
 
         V[:, 0] = rand_normalized_vector(n, dtype)
 
-        V, H, n_iter = arnoldi_decomposition(A, V, H)
+        V, H, n_iter = arnoldi_decompose(A, V, H)
         return RitzDecomposition.from_v_and_h(V, H, k, sort_function=sort_function)
 
     @pytest.mark.parametrize(
@@ -242,7 +242,7 @@ class TestRitzDecomposition:
         H = np.zeros((m+1, m), dtype=dtype)
 
         V[:, 0] = rand_normalized_vector(n, dtype)
-        V, H, n_iter = arnoldi_decomposition(A, V, H)
+        V, H, n_iter = arnoldi_decompose(A, V, H)
 
         inject_noise(V[:, max_dim:])
         inject_noise(H[max_dim+1:,max_dim:])

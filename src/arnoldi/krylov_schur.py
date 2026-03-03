@@ -1,6 +1,6 @@
 import numpy as np
 
-from .decomposition import arnoldi_decomposition
+from .decomposition import arnoldi_decompose
 from .explicit_restarts import History
 from .utils import arg_largest_magnitude, ordered_schur, rand_normalized_vector
 
@@ -50,7 +50,7 @@ def partial_schur(
     history = History.from_k(nev)
     has_converged = False
 
-    V_a, H_a, n_iter = arnoldi_decomposition(
+    V_a, H_a, n_iter = arnoldi_decompose(
         A, V, H, max_dim=max_dim, start_dim=0, invariant_tol=tol
     )
     m = n_iter
@@ -114,7 +114,7 @@ def partial_schur(
         if has_converged:
             break
 
-        V_a, H_a, n_iter = arnoldi_decomposition(
+        V_a, H_a, n_iter = arnoldi_decompose(
             A, V, H, max_dim=max_dim, start_dim=p, invariant_tol=tol
         )
         m = n_iter

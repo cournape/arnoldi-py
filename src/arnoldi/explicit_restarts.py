@@ -3,7 +3,7 @@ import dataclasses
 import numpy as np
 
 
-from .decomposition import RitzDecomposition, arnoldi_decomposition
+from .decomposition import RitzDecomposition, arnoldi_decompose
 from .utils import arg_largest_magnitude, rand_normalized_vector
 
 
@@ -48,7 +48,7 @@ def naive_explicit_restarts(A, m=None, *, stopping_criterion=None, max_restarts=
     v0 = rand_normalized_vector(n).astype(dtype)
     for i in range(max_restarts):
         V[:, 0] = v0
-        V, H, n_iter = arnoldi_decomposition(A, V, H)
+        V, H, n_iter = arnoldi_decompose(A, V, H)
         ritz = RitzDecomposition.from_v_and_h(V, H, k)
         if ritz.approximate_residuals[0] < tol:
             residuals = ritz.compute_true_residuals(A)
@@ -113,7 +113,7 @@ def explicit_restarts_with_deflation(
         V[:, k] = v0
 
         for restart in range(max_restarts):
-            V_a, H_a, n_iter = arnoldi_decomposition(
+            V_a, H_a, n_iter = arnoldi_decompose(
                 A, V, H, start_dim=k, invariant_tol=tol
             )
 

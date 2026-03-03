@@ -10,7 +10,7 @@ from .utils import arg_largest_magnitude
 norm = nlin.norm
 
 
-def arnoldi_decomposition(A, V, H, invariant_tol=None, *, start_dim=0, max_dim=None):
+def arnoldi_decompose(A, V, H, invariant_tol=None, *, start_dim=0, max_dim=None):
     """Run the arnoldi decomposition for square matrix a of dimension n.
 
     Parameters
