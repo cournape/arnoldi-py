@@ -140,3 +140,6 @@ def double_gs(w: np.ndarray, V: np.ndarray, h: np.ndarray, tol: float=1e-8):
     beta = nrm2(w)
 
     return beta, beta < tol
+
+
+DEFAULT_ORTHONORMALIZER = dgks_gs

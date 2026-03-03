@@ -2,14 +2,22 @@ import numpy as np
 
 from .decomposition import arnoldi_decompose
 from .explicit_restarts import History
+from .ortho import DEFAULT_ORTHONORMALIZER
 from .utils import arg_largest_magnitude, ordered_schur, rand_normalized_vector
 
 
 def partial_schur(
     A, nev, *, max_dim=None, stopping_criterion=None, max_restarts=100,
-    sort_function=None, p=None,
+    sort_function=None, p=None, orthonormalize=None,
 ):
     """ Compute a partial Schur decompositiokn using the Krylov-Schur algorithm
+
+    Parameters
+    ----------
+    A : ndarray of shape (n, n)
+        square matrix to be decomposed
+    nev : int
+        Number of requested eigen pairs
     """
     if stopping_criterion is None:
         tol = np.sqrt(np.finfo(A.dtype).eps)
@@ -18,6 +26,9 @@ def partial_schur(
 
     if sort_function is None:
         sort_function = arg_largest_magnitude
+
+    if orthonormalize is None:
+        orthonormalize = DEFAULT_ORTHONORMALIZER
 
     assert max_restarts > 0
 
@@ -50,10 +61,10 @@ def partial_schur(
     history = History.from_k(nev)
     has_converged = False
 
-    V_a, H_a, n_iter = arnoldi_decompose(
-        A, V, H, max_dim=max_dim, start_dim=0, invariant_tol=tol
+    V_a, H_a, m = arnoldi_decompose(
+        A, V, H, max_dim=max_dim, start_dim=0, invariant_tol=tol,
+        orthonormalize=orthonormalize
     )
-    m = n_iter
 
     for restart in range(max_restarts):
         if m != max_dim:
@@ -114,10 +125,10 @@ def partial_schur(
         if has_converged:
             break
 
-        V_a, H_a, n_iter = arnoldi_decompose(
-            A, V, H, max_dim=max_dim, start_dim=p, invariant_tol=tol
+        V_a, H_a, m = arnoldi_decompose(
+            A, V, H, max_dim=max_dim, start_dim=p, invariant_tol=tol,
+            orthonormalize=orthonormalize
         )
-        m = n_iter
 
     if not has_converged:
         raise ValueError("Has not converged !")

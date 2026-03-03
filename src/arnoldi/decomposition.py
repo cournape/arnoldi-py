@@ -3,14 +3,15 @@ import dataclasses
 import numpy as np
 import numpy.linalg as nlin
 
-from .ortho import dgks_gs
+from .ortho import DEFAULT_ORTHONORMALIZER
 from .utils import arg_largest_magnitude
 
 
 norm = nlin.norm
 
 
-def arnoldi_decompose(A, V, H, invariant_tol=None, *, start_dim=0, max_dim=None):
+def arnoldi_decompose(A, V, H, invariant_tol=None, *, start_dim=0,
+                      max_dim=None, orthonormalize=None):
     """Run the arnoldi decomposition for square matrix a of dimension n.
 
     Parameters
@@ -40,6 +41,8 @@ def arnoldi_decompose(A, V, H, invariant_tol=None, *, start_dim=0, max_dim=None)
     # Logic of sqrt copied from Julia's ArnoldiMethod.jl package
     if invariant_tol is None:
         invariant_tol = np.sqrt(np.finfo(A.dtype).eps)
+    if orthonormalize is None:
+        orthonormalize = DEFAULT_ORTHONORMALIZER
 
     n = A.shape[0]
     m = V.shape[1] - 1
@@ -57,7 +60,7 @@ def arnoldi_decompose(A, V, H, invariant_tol=None, *, start_dim=0, max_dim=None)
         w = V[:, j+1]
         w[:] = A @ V[:, j]
 
-        beta, breakdown = dgks_gs(w, V[:, :j+1], H[:j+1, j], invariant_tol)
+        beta, breakdown = orthonormalize(w, V[:, :j+1], H[:j+1, j], invariant_tol)
         if breakdown:
             max_dim = j + 1
             return V[:, :max_dim+1], H[:max_dim+1, :max_dim], max_dim
