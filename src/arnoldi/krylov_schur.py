@@ -1,5 +1,6 @@
 import numpy as np
 
+from .callbacks import Callback
 from .decomposition import arnoldi_decompose
 from .explicit_restarts import History
 from .ortho import DEFAULT_ORTHONORMALIZER
@@ -8,7 +9,7 @@ from .utils import arg_largest_magnitude, ordered_schur, rand_normalized_vector
 
 def partial_schur(
     A, nev, *, max_dim=None, stopping_criterion=None, max_restarts=100,
-    sort_function=None, p=None, orthonormalize=None,
+    sort_function=None, p=None, orthonormalize=None, callback=None,
 ):
     """ Compute a partial Schur decompositiokn using the Krylov-Schur algorithm
 
@@ -38,6 +39,9 @@ def partial_schur(
     if max_dim is None:
         max_dim = min(max(2 * nev + 1, 20), n)
 
+    if callback is None:
+        callback = Callback()
+
     # p is the size of the active size after compression. If None, use
     # "dynamic" p. In that case, we will use same logic as SLEPc:
     #   p = nconv + max(1, floor(max_dim - nconv) * keep)
@@ -64,10 +68,12 @@ def partial_schur(
     start_dim = 0
 
     for restart in range(max_restarts):
+        callback.on_arnoldi_start(restart, A, V, H, start_dim, max_dim)
         V_a, H_a, m = arnoldi_decompose(
             A, V, H, max_dim=max_dim, start_dim=start_dim, invariant_tol=tol,
             orthonormalize=orthonormalize
         )
+        callback.on_arnoldi_end(restart, A, V, H, m)
 
         if m != max_dim:
             happy_breakdown = True
@@ -84,8 +90,11 @@ def partial_schur(
         T, Q = ordered_schur(H_active, output="complex", sort_function=sort_function)
 
         ## Check convergence
-        approximate_residuals = np.abs(H_a[-1, -1] * Q[m-1, :])
-        approximate_convergence = approximate_residuals / np.abs(np.diag(T[:, :]))
+        beta_m, q_m = H_a[-1, -1], Q[m-1, :]
+        ritz_values = np.diag(T)
+        approximate_convergence = callback.on_convergence_check(
+            restart, A, ritz_values, beta_m, q_m
+        )
 
         for k in range(nev):
             if approximate_convergence[k] <= tol:
@@ -122,6 +131,9 @@ def partial_schur(
         H[:p, :p] = Tp
         H[p, :p] = old_coupling @ Qp
 
+        callback.on_restart_end(
+            restart, n_converged, ritz_values, approximate_convergence
+        )
         has_converged = happy_breakdown or n_converged >= nev
         if has_converged:
             break
