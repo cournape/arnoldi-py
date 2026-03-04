@@ -105,3 +105,41 @@ def dgks_gs(w: np.ndarray, V: np.ndarray, h: np.ndarray, tol: float=1e-8,
         beta = nrm2(w)
 
     return beta, beta < tol
+
+
+def double_gs(w: np.ndarray, V: np.ndarray, h: np.ndarray, tol: float=1e-8):
+    """ Double reorthonormalization using Gram-Schmidt
+
+    Parameters
+    ----------
+    w: ndarray of shape (n,)
+        The array to orthonormalize
+    V: ndarray of shape (n, j)
+        The basis to orthonormalize against
+    h: ndarray of shape (j,)
+        The array to accumulate the scalar products (modified in place)
+
+    Returns
+    -------
+    beta: float
+        the final norm of w after orthonormalization
+    breakdown: bool
+        True if w could not be orthonormalized against V, i.e. when w is in the
+        span of V
+
+    """
+    j = V.shape[1]
+
+    tmp = gemv(1.0, V, w, trans=2)
+    h[:j+1] = tmp
+    w -= gemv(1.0, V, tmp)
+
+    tmp = gemv(1.0, V, w, trans=2)
+    h[:j+1] += tmp
+    w -= gemv(1.0, V, tmp)
+    beta = nrm2(w)
+
+    return beta, beta < tol
+
+
+DEFAULT_ORTHONORMALIZER = dgks_gs

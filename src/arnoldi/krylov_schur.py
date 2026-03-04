@@ -1,15 +1,24 @@
 import numpy as np
 
-from .decomposition import arnoldi_decomposition
+from .callbacks import Callback
+from .decomposition import arnoldi_decompose
 from .explicit_restarts import History
+from .ortho import DEFAULT_ORTHONORMALIZER
 from .utils import arg_largest_magnitude, ordered_schur, rand_normalized_vector
 
 
 def partial_schur(
     A, nev, *, max_dim=None, stopping_criterion=None, max_restarts=100,
-    sort_function=None, p=None,
+    sort_function=None, p=None, orthonormalize=None, callback=None,
 ):
     """ Compute a partial Schur decompositiokn using the Krylov-Schur algorithm
+
+    Parameters
+    ----------
+    A : ndarray of shape (n, n)
+        square matrix to be decomposed
+    nev : int
+        Number of requested eigen pairs
     """
     if stopping_criterion is None:
         tol = np.sqrt(np.finfo(A.dtype).eps)
@@ -19,6 +28,9 @@ def partial_schur(
     if sort_function is None:
         sort_function = arg_largest_magnitude
 
+    if orthonormalize is None:
+        orthonormalize = DEFAULT_ORTHONORMALIZER
+
     assert max_restarts > 0
 
     n = A.shape[0]
@@ -26,6 +38,9 @@ def partial_schur(
 
     if max_dim is None:
         max_dim = min(max(2 * nev + 1, 20), n)
+
+    if callback is None:
+        callback = Callback()
 
     # p is the size of the active size after compression. If None, use
     # "dynamic" p. In that case, we will use same logic as SLEPc:
@@ -50,18 +65,23 @@ def partial_schur(
     history = History.from_k(nev)
     has_converged = False
 
-    V_a, H_a, n_iter = arnoldi_decomposition(
-        A, V, H, max_dim=max_dim, start_dim=0, invariant_tol=tol
-    )
-    m = n_iter
+    start_dim = 0
 
     for restart in range(max_restarts):
+        callback.on_arnoldi_start(restart, A, V, H, start_dim, max_dim)
+        V_a, H_a, m = arnoldi_decompose(
+            A, V, H, max_dim=max_dim, start_dim=start_dim, invariant_tol=tol,
+            orthonormalize=orthonormalize
+        )
+        callback.on_arnoldi_end(restart, A, V, H, m)
+
         if m != max_dim:
             happy_breakdown = True
             raise ValueError("Happy breakdown not supported yet")
         else:
             happy_breakdown = False
 
+        # FIXME: this logic is broken
         matvecs = restart * (max_dim - nev) + (m - nev)
 
         V_active = V_a[:, :m]
@@ -70,12 +90,14 @@ def partial_schur(
         T, Q = ordered_schur(H_active, output="complex", sort_function=sort_function)
 
         ## Check convergence
-        approximate_residuals = np.abs(H_a[-1, -1] * Q[m-1, :])
-        approximate_convergence = approximate_residuals / np.abs(np.diag(T[:, :]))
+        beta_m, q_m = H_a[-1, -1], Q[m-1, :]
+        ritz_values = np.diag(T)
+        approximate_convergence = callback.on_convergence_check(
+            restart, A, ritz_values, beta_m, q_m
+        )
 
         for k in range(nev):
             if approximate_convergence[k] <= tol:
-                # FIXME: this logic is broken
                 history.matvecs[k] = matvecs
                 history.restarts[k] = restart + 1
 
@@ -87,7 +109,6 @@ def partial_schur(
 
         if use_dynamic_p:
             p = n_converged + max(1, int(np.floor((max_dim - n_converged) * keep)))
-
         # assert to shut up the type checker
         assert p is not None
 
@@ -100,7 +121,7 @@ def partial_schur(
         # basis as the last vector of the truncated basis
         V[:, p] = V[:, m]
 
-        # Resetting H to 0 is critical in the case of synamic p w/o locking,
+        # Resetting H to 0 is critical in the case of dynamic p w/o locking,
         # as p may decrease between iterations  in this case. Without resetting
         # to 0, Arnoldi decomposition would use some obsolete data, breaking
         # the Arnoldi invariants.
@@ -110,14 +131,14 @@ def partial_schur(
         H[:p, :p] = Tp
         H[p, :p] = old_coupling @ Qp
 
+        callback.on_restart_end(
+            restart, n_converged, ritz_values, approximate_convergence
+        )
         has_converged = happy_breakdown or n_converged >= nev
         if has_converged:
             break
 
-        V_a, H_a, n_iter = arnoldi_decomposition(
-            A, V, H, max_dim=max_dim, start_dim=p, invariant_tol=tol
-        )
-        m = n_iter
+        start_dim = p
 
     if not has_converged:
         raise ValueError("Has not converged !")
