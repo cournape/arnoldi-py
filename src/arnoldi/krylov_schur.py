@@ -61,12 +61,14 @@ def partial_schur(
     history = History.from_k(nev)
     has_converged = False
 
-    V_a, H_a, m = arnoldi_decompose(
-        A, V, H, max_dim=max_dim, start_dim=0, invariant_tol=tol,
-        orthonormalize=orthonormalize
-    )
+    start_dim = 0
 
     for restart in range(max_restarts):
+        V_a, H_a, m = arnoldi_decompose(
+            A, V, H, max_dim=max_dim, start_dim=start_dim, invariant_tol=tol,
+            orthonormalize=orthonormalize
+        )
+
         if m != max_dim:
             happy_breakdown = True
             raise ValueError("Happy breakdown not supported yet")
@@ -124,10 +126,7 @@ def partial_schur(
         if has_converged:
             break
 
-        V_a, H_a, m = arnoldi_decompose(
-            A, V, H, max_dim=max_dim, start_dim=p, invariant_tol=tol,
-            orthonormalize=orthonormalize
-        )
+        start_dim = p
 
     if not has_converged:
         raise ValueError("Has not converged !")
