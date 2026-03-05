@@ -74,7 +74,7 @@ Why is this useful?
    3. spectral clustering (used in scikit learn)
 2. Network analysis
    1. Graph Laplacian: the second smallest eigenvalue of the graph Laplacian is
-   0 iff the graph is disconnected (and "mostly" disconnected if close to 0)
+   0 iff the graph is disconnected
    2. Random walk: PageRank (Google's original algorithm) finds the stationary
    distribution of a random walk via the dominant eigenvector of the
    transition matrix
@@ -84,18 +84,13 @@ Why is this useful?
 
 An eigensolver is an algorithm that can numerically compute the eigenpairs of
 a matrix. E.g. numpy.linalg.eig, which uses the underlying LAPACK library.
-Typically, the algorithm works in two phases:
-
-1. Transform the matrix into an equivalent Hessenberg form (upper triangular
-   except for the first subdiagonal)
-2. Apply QR transformations to find the eigenpairs from the Hessenberg form
-
 This algorithm is O(N^3), and works well if you want all the eigenpairs and
-you work with dense matrices. In some applications, you want either 1) to find
-only a couple of eigenpairs (largest, smallest, or the ones closest to a given
-region of the complex plane) or 2) you can't store the full matrix because it
-is too big, i.e. it is sparse (number of != 0 entries is small, typically 1 %
-or less).
+you work with dense matrices.
+
+In some applications, you want either 1) to find only a couple of eigenpairs
+(largest, smallest, or the ones closest to a given region of the complex plane)
+or 2) you can't store the full matrix because it is too big, i.e. it is sparse
+(number of != 0 entries is small, typically 1 % or less).
 
 Many practical applications meet those two conditions. For example:
 
@@ -128,15 +123,6 @@ A = sp.random(n, n, density=density)
 eigenvalues, eigenvectors = spla.eigs(A, k=2, which="LM")
 ```
 
-**Note:** what is LAPACK? BLAS / LAPACK are a set of routines (functions),
-originally written in Fortran in the 1970s, for linear algebra. E.g. the BLAS
-function dgemv is a function to compute y = A x + b given A, x and b. Those
-libraries can be written in very optimized code, and every CPU architecture
-used to provide an optimized implementation. Those could be 10x faster, sometimes even more, compared to a typical implementation, thanks to very low-level optimization
-(SIMD, etc.). For example, Apple provides the Accelerate framework that implements
-those functions for the M* architecture, Intel the MKL, CUDA for NVIDIA (GPU).
-OpenBLAS, an OSS implementation, tends to be competitive on CPU.
-
 ### Why write a new solver?
 
 ARPACK, like many Fortran libraries, is written in arcane Fortran, which is
@@ -163,14 +149,6 @@ ChatGPT and then claude code, I could complete this in a couple of days, from
 literature research to competitive implementation** even as I still wrote all
 the non-boilerplate code! As a bonus, I am now familiar with the basics of sparse
 eigensolver methodology.
-
-**Note**: scipy incorporates various libraries written in Fortran, sometimes in the
-1970s! In that time, there were no screens but teletypes, and you would submit
-your code in batches through punchcards. Those punchcards had a specific format
-of 80 columns, and to this day many editors default to 80 columns. Modern
-Fortran is actually a decent language for numerical computing, but many old
-libraries are full of goto and other constructs used when for loops were not
-common. [Example](https://github.com/scipy/scipy/blob/6e246d0b54dd55dc69232a0caae6772228a7ac25/scipy/integrate/odepack/lsoda.f) if you want to be scared.
 
 ## Basics of sparse eigensolver
 
@@ -477,3 +455,36 @@ at generating math through LaTeX.
 **Note**: in this specific case, you definitely want to use OPUS, not sonnet. I
 was trying to reproduce the output without success until I realized I was using
 a weak model.
+
+## Conlusion
+
+1. Start using a coding agent now. You don't need configuration to start using
+   it. Seeing and using is believing
+2. Start use it for scripting, one-off actions, things you know how to do by
+   hand so that you can verify the output, and are drudgery.
+3. Leverage the agentic loop: give it a task that can be done by looping over a
+   well setup (e.g. a script). Then it can do the work for you in the background
+4. It is not useful only for writing code, but also to interact with code:
+   understand a codebase, ask specific implementation questions, review your
+   code
+
+## Notes and references
+
+**Note:** what is LAPACK? BLAS / LAPACK are a set of routines (functions),
+originally written in Fortran in the 1970s, for linear algebra. E.g. the BLAS
+function dgemv is a function to compute y = A x + b given A, x and b. Those
+libraries can be written in very optimized code, and every CPU architecture
+used to provide an optimized implementation. Those could be 10x faster,
+sometimes even more, compared to a typical implementation, thanks to very
+low-level optimization (SIMD, etc.). For example, Apple provides the Accelerate
+framework that implements those functions for the M* architecture, Intel the
+MKL, CUDA for NVIDIA (GPU). OpenBLAS, an OSS implementation, tends to be
+competitive on CPU.
+
+**Note**: scipy incorporates various libraries written in Fortran, sometimes in the
+1970s! In that time, there were no screens but teletypes, and you would submit
+your code in batches through punchcards. Those punchcards had a specific format
+of 80 columns, and to this day many editors default to 80 columns. Modern
+Fortran is actually a decent language for numerical computing, but many old
+libraries are full of goto and other constructs used when for loops were not
+common. [Example](https://github.com/scipy/scipy/blob/6e246d0b54dd55dc69232a0caae6772228a7ac25/scipy/integrate/odepack/lsoda.f) if you want to be scared.
