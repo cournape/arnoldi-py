@@ -109,10 +109,10 @@ Many practical applications meet those two conditions. For example:
 2. Finding the largest eigenpair of the Google matrix (PageRank): the Google
    matrix is defined such that column j represents where a random user would go
    after visiting web page j, i.e. N x N where N is the number of pages on the
-   web (oversimplified)
+   web (oversimplified).
 
 Most numerical packages (numpy/scipy, matlab, octave, mathematica) use ARPACK,
-a Fortran library to find a few eigenpairs of a sparse matrix. Example in scipy
+a Fortran library to find a few eigenpairs of a sparse matrix. Example in scipy:
 
 ```python
 import numpy as np
@@ -141,18 +141,18 @@ OpenBLAS, an OSS implementation, tends to be competitive on CPU.
 
 ARPACK, like many Fortran libraries, is written in arcane Fortran, which is
 difficult to maintain. Also, today we want to leverage heterogeneous hardware
-(e.g. GPU), and if it is written in Fortran, it becomes a black box hard to run
+(e.g. GPU), and if it is written in Fortran, it becomes a black box that is hard to run
 on new hardware.
 
-I had this project for ~15 years to rewrite a better version, but never found
+I had had this project for ~15 years to rewrite a better version, but never found
 the time. In 2024, I used some downtime at a conference to try to get ChatGPT
-to give me the steps needed to implement a state-of-the-art implementation.
+to give me the steps needed for a state-of-the-art implementation.
 
 One twist: for copyright reasons, we used no AI-generated code for the
-algorithm itself. So our goals were
+algorithm itself. So our goals were:
 
 1. **Implement a SOTA sparse eigensolver**: at least as fast as ARPACK, but in
-   python and easy to extend
+   Python and easy to extend
 2. **Do it in a couple of days' worth of work**: not part of my current job
    obviously, and I am not a grad student anymore
 3. **Do not generate code directly**: the hope is to incorporate it in scipy
@@ -286,7 +286,7 @@ printed its output, and asked claude code to find the bug by trying different
 matrices and parameters, with examples that worked and one that did not. It ran
 in an agentic mode and finally found that based on the matrix type (real vs.
 complex), there was a missing conjugate when handling convergence. That was a
-big "aha" moment for me. Copying/pasting the code in ChatGPT to find the bug did
+big "aha" moment for me. Copying/pasting the code into ChatGPT to find the bug did
 not work, and the point is easily glossed over when you look at an algorithm
 description. I made a few attempts in 2025 to fix this bug, and would have
 likely given up if it were not for claude code.
@@ -346,17 +346,17 @@ Instead, I asked CC to confirm the important invariants to check: V orthonormal,
 equality of $A V - H V$ and approximate residuals, etc. Then I wrote [the tests
 based on those
 invariants](https://github.com/cournape/arnoldi-py/blob/main/tests/test_decomposition.py#L36),
-though CC could ofc have generated those itself.
+though CC could of course have generated those itself.
 
 **AGENTIC AI LESSON**: be careful when writing tests from the code being tested. It
 will result in bad tests. Think "write specifications of the tests", then
 review, then ask CC to write tests from the specifications to check.
 
-**note**: this is a key principle of successful agent/LLM usage, agentic coding or
-otherwise. Those tools are really good if checking a solution can be done more
-easily / faster than finding a solution. Because then agents can loop in the
-background and figure it out by themselves. If however it is very difficult to
-check the LLM output, and even more so at scale, then most likely LLM will not
+**Note**: this is a key principle of successful agent/LLM usage, agentic coding or
+otherwise. Those tools are really good when checking a solution can be done more
+easily or faster than finding one, because then agents can loop in the
+background and figure it out by themselves. If, however, it is very difficult to
+check the LLM output, and even more so at scale, then LLMs will most likely not
 work very well. There are similarities to LLM/agent evals.
 
 ### Finding another non-trivial convergence bug
@@ -364,7 +364,7 @@ work very well. There are similarities to LLM/agent evals.
 Another mind-blowing moment was CC finding a non-trivial bug.
 The Krylov-Schur method has a step where it truncates a transform of the Hessenberg
 matrix. For simplicity, I started with a fixed truncation factor $p$, which
-worked well enough. However dynamic $p$ (as more pairs converge) is more
+worked well enough. However, dynamic $p$ (as more pairs converge) is more
 efficient. Unfortunately, following the same logic as SLEPc caused a complete
 breakdown of convergence.
 
@@ -472,8 +472,8 @@ reverse literate programming.
 **AGENTIC AI LESSON**: use them to summarize or deep-dive into codebases that
 can act as a reference or that you need to understand for your work. It is
 specifically good at linking multiple references together, and is now very good
-at generating math through latex.
+at generating math through LaTeX.
 
-**note**: in this specific case, you definitely want to use OPUS, not sonnet. I
+**Note**: in this specific case, you definitely want to use OPUS, not sonnet. I
 was trying to reproduce the output without success until I realized I was using
 a weak model.
