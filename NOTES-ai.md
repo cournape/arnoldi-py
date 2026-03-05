@@ -54,18 +54,8 @@ completely different with a tool like that.
 
 ## A bit of context
 
-### Reminder on eigen decomposition and its applications
-
-In the simple case, we say $\lambda, v$ is an eigenpair for the matrix $A$ if:
-
-  $$ A v = \lambda v $$
-
-$\lambda$ is the eigenvalue, and $v$ an eigenvector. Conceptually, it means $v$
-is an invariant for $A$, i.e. $v$ stays in the same direction after applying
-the linear operator of $A$. It is closely related to Singular Value
-Decomposition (SVD).
-
-Why is this useful?
+Finding eigenvalues/eigenvector and SVD of matrices is a key algorithm.  It is
+useful for many tasks:
 
 1. Used to find low rank approximation of large matrices:
    1. PCA in data analysis
@@ -80,34 +70,19 @@ Why is this useful?
    transition matrix
 3. Many more applications in physics, etc.
 
-### Eigen solver, sparse matrices
+In the simple case, we say $\lambda, v$ is an eigenpair for the matrix $A$ if:
 
-An eigensolver is an algorithm that can numerically compute the eigenpairs of
-a matrix. E.g. numpy.linalg.eig, which uses the underlying LAPACK library.
-This algorithm is O(N^3), and works well if you want all the eigenpairs and
-you work with dense matrices.
+  $$ A v = \lambda v $$
 
-In some applications, you want either 1) to find only a couple of eigenpairs
-(largest, smallest, or the ones closest to a given region of the complex plane)
-or 2) you can't store the full matrix because it is too big, i.e. it is sparse
-(number of != 0 entries is small, typically 1 % or less).
+$\lambda$ is the eigenvalue, and $v$ an eigenvector. Conceptually, it means $v$
+is an invariant for $A$, i.e. $v$ stays in the same direction after applying
+the linear operator of $A$. It is closely related to Singular Value
+Decomposition (SVD).
 
-Many practical applications meet those two conditions. For example:
-
-1. Collaborative filtering: you have an N x M matrix, for N users and M items,
-   and each entry contains the user score. You want to predict the score for
-   a new (user, movie) pair, which can be done through factorization /
-   completion. The matrix is sparse (any user has only watched a couple of
-   movies), and completion through low-rank approximation (e.g. top 100
-   eigenpairs) is feasible. M is maybe 10k, and N is maybe 100e6. The full
-   matrix would be ~7.5 TB, and it would take forever to run an O(n^3) algorithm.
-2. Finding the largest eigenpair of the Google matrix (PageRank): the Google
-   matrix is defined such that column j represents where a random user would go
-   after visiting web page j, i.e. N x N where N is the number of pages on the
-   web (oversimplified).
-
-Most numerical packages (numpy/scipy, matlab, octave, mathematica) use ARPACK,
-a Fortran library to find a few eigenpairs of a sparse matrix. Example in scipy:
+Sparse eigensolver are algorithms which can find only a few eigen pairs of a
+potentially very large, sparse (non zero entries << zeros, generally 1 % or
+less). E.g. original netflix prize matrix was ~20k x 500k, oroginal "Google
+Matrix" of the 1998 page rank paper ~ 24 millions x 24 millions.
 
 ```python
 import numpy as np
@@ -123,22 +98,17 @@ A = sp.random(n, n, density=density)
 eigenvalues, eigenvectors = spla.eigs(A, k=2, which="LM")
 ```
 
-### Why write a new solver?
+I had had this project for ~15 years to rewrite a better version, but never
+found the time. In 2024, my friend Stefan van der Walt reminded me of those
+discussions, and I used some downtime at Scipy 2024 conference to try to get
+ChatGPT to give me the steps needed for a state-of-the-art implementation. One
+twist: for copyright reasons, I wanted to write the code myself, understand the
+algorithm completely, and not ask the AI to write the code for me.
 
-ARPACK, like many Fortran libraries, is written in arcane Fortran, which is
-difficult to maintain. Also, today we want to leverage heterogeneous hardware
-(e.g. GPU), and if it is written in Fortran, it becomes a black box that is hard to run
-on new hardware.
+So my goals were:
 
-I had had this project for ~15 years to rewrite a better version, but never found
-the time. In 2024, I used some downtime at a conference to try to get ChatGPT
-to give me the steps needed for a state-of-the-art implementation.
-
-One twist: for copyright reasons, we used no AI-generated code for the
-algorithm itself. So our goals were:
-
-1. **Implement a SOTA sparse eigensolver**: at least as fast as ARPACK, but in
-   Python and easy to extend
+1. **Implement a SOTA sparse eigensolver**: at least as fast as scipy's one,
+   but in Python and easy to extend
 2. **Do it in a couple of days' worth of work**: not part of my current job
    obviously, and I am not a grad student anymore
 3. **Do not generate code directly**: the hope is to incorporate it in scipy
@@ -147,99 +117,9 @@ algorithm itself. So our goals were:
 Key point: agentic coding is useful even under this constraint. **Thanks to
 ChatGPT and then claude code, I could complete this in a couple of days, from
 literature research to competitive implementation** even as I still wrote all
-the non-boilerplate code! As a bonus, I am now familiar with the basics of sparse
-eigensolver methodology.
+the non-boilerplate code!
 
-## Basics of sparse eigensolver
-
-In this section, we will review the basics of a set of algorithms called
-Krylov-based methods. We will also explain how I used ChatGPT to do literature
-review, learn details of algorithms, and use claude code to debug a convergence
-issue.
-
-### Power method
-
-The algorithms we discuss are so-called Krylov-based methods, which build on
-the power method. The power method can help find the eigenpair for the largest eigenvalue
-if $|\lambda| > 1$. The basic idea is simple:
-
-  Algorithm:
-
-  1. Choose a random starting vector $v_0 \in \mathbb{R}^n$, $|v_0| = 1$
-  2. For $k = 1, 2, \ldots$ until convergence:
-
-  $$z_k = A v_{k-1}$$
-  $$v_k = \frac{z_k}{|z_k|}$$
-
-This algorithm has a key advantage: it does not need to "know" $A$, but only
-how to calculate the function $f(x) = A x$. As long as you can define this
-function, the algorithm works. If the function is easy to distribute, then you
-can find the top eigenvalue/eigenvector on a cluster of machines (initial
-PageRank partitioned the underlying graph).
-
-### Krylov basis
-
-The power method is not efficient because at every step, it "throws away" the
-previous estimate $v_k$. It is more practical to consider the Krylov basis
-$\mathcal{K}_m(A, v)$:
-
-$$\mathcal{K}_m(A, v) = \mathrm{span}\left\{ v, Av, A^2 v, \ldots, A^{m-1} v \right\}$$
-
-Unfortunately, there is a problem building a Krylov basis from a numerical
-perspective. As the power of A increases, $A^p v_{p-1}$ and $v_{p-1}$ become increasingly likely to be (numerically)
-collinear, which means you get "stuck".
-
-### Arnoldi decomposition
-
-Many modern algorithms are based on Arnoldi decomposition. Arnoldi
-decomposition iteratively computes an orthonormal basis of the Krylov space.
-
-After $m$ steps, the Arnoldi decomposition reads:
-
- $$A V_m = V_m H_m + h_{m+1,m}\, v_{m+1} e_m^T$$
-
-where:
-
-  - $V_m = \lbrack v_1 \mid v_2 \mid \cdots \mid v_m \rbrack \in \mathbb{R}^{n \times m}$
-  has orthonormal columns spanning $\mathcal{K}_m(A, v_1)$
-  - $H_m \in \mathbb{R}^{m \times m}$ is upper Hessenberg
-  - $h_{m+1,m}$ is the next off-diagonal entry
-  - $e_m \in \mathbb{R}^m$ is the $m$-th canonical basis vector
-
-Equivalently, multiplying on the right by $V_m^T$:
-
-  $$H_m = V_m^T A V_m$$
-
-Note that $H_m$ is much smaller than $A$, as long as $m \ll n$. Finding the
-eigenpairs of $H_m$ as a dense matrix is doable. $m$ is generally a few times
-the number of eigenpairs you are interested in. E.g. to find the top 50 eigenpairs of a one million by one million matrix,
-using $m \approx 200$ is enough, so $H_m$ is $200 \times 200$, and even $V_m$
-is still manageable on a decent machine. The eigenpairs of $H_m$ are called
-Ritz pairs of $A$. There are theoretical justifications that Ritz values are
-good approximations of $A$'s eigenvalues, and Ritz vectors projected back to
-$A$'s space through $V_m$ are eigenvectors.
-
-### Beyond Arnoldi
-
-Arnoldi has two limitations:
-
-1. You need to increase $m$ if you want more precision
-2. You can only find the first eigenpair
-
-The first problem is solved through *restarts*: if convergence is not achieved
-after a limit $m_1$, the algorithm uses the latest vector as the new vector
-$v_0$ and restarts an Arnoldi decomposition "from scratch". The convergence rate
-is somewhat slower per cycle, but the required size of $V$ (and thus the cost
-of orthonormalization) remains bounded.
-
-The second problem is harder to solve, and accounts for most of ARPACK's
-complexity. After finding the first eigenpair, it creates a new Krylov space, but
-*deflates* the already converged pair(s), i.e. it ensures the new Krylov space
-does not contain the direction of the converged eigenvectors.
-
-In the early 2000s, a new formulation called Krylov-Schur was discovered. It
-is much simpler to implement. It is the default method used in SLEPc, and the
-one I decided to implement.
+As a bonus, I am now familiar with the basics of sparse eigensolver methodology.
 
 ### How did I use AI for this section?
 
@@ -488,3 +368,149 @@ of 80 columns, and to this day many editors default to 80 columns. Modern
 Fortran is actually a decent language for numerical computing, but many old
 libraries are full of goto and other constructs used when for loops were not
 common. [Example](https://github.com/scipy/scipy/blob/6e246d0b54dd55dc69232a0caae6772228a7ac25/scipy/integrate/odepack/lsoda.f) if you want to be scared.
+
+## Some background on sparse eigen decomposition
+
+### eigen decomposition and its applications
+
+Why is this useful?
+
+1. Used to find low rank approximation of large matrices:
+   1. PCA in data analysis
+   2. non-negative matrix factorization, e.g. for collaborative filtering
+     (recommendation)
+   3. spectral clustering (used in scikit learn)
+2. Network analysis
+   1. Graph Laplacian: the second smallest eigenvalue of the graph Laplacian is
+   0 iff the graph is disconnected
+   2. Random walk: PageRank (Google's original algorithm) finds the stationary
+   distribution of a random walk via the dominant eigenvector of the
+   transition matrix
+3. Many more applications in physics, etc.
+
+### Eigen solver, sparse matrices
+
+An eigensolver is an algorithm that can numerically compute the eigenpairs of
+a matrix. E.g. numpy.linalg.eig, which uses the underlying LAPACK library.
+This algorithm is O(N^3), and works well if you want all the eigenpairs and
+you work with dense matrices.
+
+In some applications, you want either 1) to find only a couple of eigenpairs
+(largest, smallest, or the ones closest to a given region of the complex plane)
+or 2) you can't store the full matrix because it is too big, i.e. it is sparse
+(number of != 0 entries is small, typically 1 % or less).
+
+Many practical applications meet those two conditions. For example:
+
+1. Collaborative filtering: you have an N x M matrix, for N users and M items,
+   and each entry contains the user score. You want to predict the score for
+   a new (user, movie) pair, which can be done through factorization /
+   completion. The matrix is sparse (any user has only watched a couple of
+   movies), and completion through low-rank approximation (e.g. top 100
+   eigenpairs) is feasible. M is maybe 10k, and N is maybe 100e6. The full
+   matrix would be ~7.5 TB, and it would take forever to run an O(n^3) algorithm.
+2. Finding the largest eigenpair of the Google matrix (PageRank): the Google
+   matrix is defined such that column j represents where a random user would go
+   after visiting web page j, i.e. N x N where N is the number of pages on the
+   web (oversimplified).
+
+Most numerical packages (numpy/scipy, matlab, octave, mathematica) use ARPACK,
+a Fortran library to find a few eigenpairs of a sparse matrix.
+
+### Why write a new solver?
+
+ARPACK, like many Fortran libraries, is written in arcane Fortran, which is
+difficult to maintain. Also, today we want to leverage heterogeneous hardware
+(e.g. GPU), and if it is written in Fortran, it becomes a black box that is
+hard to run on new hardware.
+
+### Basics of sparse eigensolver
+
+In this section, we will review the basics of a set of algorithms called
+Krylov-based methods. We will also explain how I used ChatGPT to do literature
+review, learn details of algorithms, and use claude code to debug a convergence
+issue.
+
+#### Power method
+
+The algorithms we discuss are so-called Krylov-based methods, which build on
+the power method. The power method can help find the eigenpair for the largest eigenvalue
+if $|\lambda| > 1$. The basic idea is simple:
+
+  Algorithm:
+
+  1. Choose a random starting vector $v_0 \in \mathbb{R}^n$, $|v_0| = 1$
+  2. For $k = 1, 2, \ldots$ until convergence:
+
+  $$z_k = A v_{k-1}$$
+  $$v_k = \frac{z_k}{|z_k|}$$
+
+This algorithm has a key advantage: it does not need to "know" $A$, but only
+how to calculate the function $f(x) = A x$. As long as you can define this
+function, the algorithm works. If the function is easy to distribute, then you
+can find the top eigenvalue/eigenvector on a cluster of machines (initial
+PageRank partitioned the underlying graph).
+
+#### Krylov basis
+
+The power method is not efficient because at every step, it "throws away" the
+previous estimate $v_k$. It is more practical to consider the Krylov basis
+$\mathcal{K}_m(A, v)$:
+
+$$\mathcal{K}_m(A, v) = \mathrm{span}\left\{ v, Av, A^2 v, \ldots, A^{m-1} v \right\}$$
+
+Unfortunately, there is a problem building a Krylov basis from a numerical
+perspective. As the power of A increases, $A^p v_{p-1}$ and $v_{p-1}$ become increasingly likely to be (numerically)
+collinear, which means you get "stuck".
+
+#### Arnoldi decomposition
+
+Many modern algorithms are based on Arnoldi decomposition. Arnoldi
+decomposition iteratively computes an orthonormal basis of the Krylov space.
+
+After $m$ steps, the Arnoldi decomposition reads:
+
+ $$A V_m = V_m H_m + h_{m+1,m}\, v_{m+1} e_m^T$$
+
+where:
+
+  - $V_m = \lbrack v_1 \mid v_2 \mid \cdots \mid v_m \rbrack \in \mathbb{R}^{n \times m}$
+  has orthonormal columns spanning $\mathcal{K}_m(A, v_1)$
+  - $H_m \in \mathbb{R}^{m \times m}$ is upper Hessenberg
+  - $h_{m+1,m}$ is the next off-diagonal entry
+  - $e_m \in \mathbb{R}^m$ is the $m$-th canonical basis vector
+
+Equivalently, multiplying on the right by $V_m^T$:
+
+  $$H_m = V_m^T A V_m$$
+
+Note that $H_m$ is much smaller than $A$, as long as $m \ll n$. Finding the
+eigenpairs of $H_m$ as a dense matrix is doable. $m$ is generally a few times
+the number of eigenpairs you are interested in. E.g. to find the top 50 eigenpairs of a one million by one million matrix,
+using $m \approx 200$ is enough, so $H_m$ is $200 \times 200$, and even $V_m$
+is still manageable on a decent machine. The eigenpairs of $H_m$ are called
+Ritz pairs of $A$. There are theoretical justifications that Ritz values are
+good approximations of $A$'s eigenvalues, and Ritz vectors projected back to
+$A$'s space through $V_m$ are eigenvectors.
+
+#### Beyond Arnoldi
+
+Arnoldi has two limitations:
+
+1. You need to increase $m$ if you want more precision
+2. You can only find the first eigenpair
+
+The first problem is solved through *restarts*: if convergence is not achieved
+after a limit $m_1$, the algorithm uses the latest vector as the new vector
+$v_0$ and restarts an Arnoldi decomposition "from scratch". The convergence rate
+is somewhat slower per cycle, but the required size of $V$ (and thus the cost
+of orthonormalization) remains bounded.
+
+The second problem is harder to solve, and accounts for most of ARPACK's
+complexity. After finding the first eigenpair, it creates a new Krylov space, but
+*deflates* the already converged pair(s), i.e. it ensures the new Krylov space
+does not contain the direction of the converged eigenvectors.
+
+In the early 2000s, a new formulation called Krylov-Schur was discovered. It
+is much simpler to implement. It is the default method used in SLEPc, and the
+one I decided to implement.
