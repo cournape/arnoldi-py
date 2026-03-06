@@ -54,7 +54,7 @@ completely different with a tool like that.
 
 ## A bit of context
 
-Finding eigenvalues/eigenvector and SVD of matrices is a key algorithm.  It is
+Finding eigenvalues/eigenvectors and SVD of matrices is a key computation. It is
 useful for many tasks:
 
 1. Used to find low rank approximation of large matrices:
@@ -79,10 +79,11 @@ is an invariant for $A$, i.e. $v$ stays in the same direction after applying
 the linear operator of $A$. It is closely related to Singular Value
 Decomposition (SVD).
 
-Sparse eigensolver are algorithms which can find only a few eigen pairs of a
-potentially very large, sparse (non zero entries << zeros, generally 1 % or
-less). E.g. original netflix prize matrix was ~20k x 500k, oroginal "Google
-Matrix" of the 1998 page rank paper ~ 24 millions x 24 millions.
+Sparse eigensolvers are algorithms that can find only a few eigenpairs of a
+potentially very large, sparse matrix (non-zero entries << zeros, generally 1%
+or less). E.g. the original Netflix Prize matrix was ~20k x 500k, and the
+original "Google Matrix" of the 1998 PageRank paper was ~24 million x 24
+million.
 
 ```python
 import numpy as np
@@ -100,7 +101,7 @@ eigenvalues, eigenvectors = spla.eigs(A, k=2, which="LM")
 
 I had had this project for ~15 years to rewrite a better version, but never
 found the time. In 2024, my friend Stefan van der Walt reminded me of those
-discussions, and I used some downtime at Scipy 2024 conference to try to get
+discussions, and I used some downtime at the SciPy 2024 conference to try to get
 ChatGPT to give me the steps needed for a state-of-the-art implementation. One
 twist: for copyright reasons, I wanted to write the code myself, understand the
 algorithm completely, and not ask the AI to write the code for me.
@@ -181,7 +182,7 @@ Now, [those](https://github.com/cournape/arnoldi-py/blob/main/scripts/plot-stres
 
 I mentioned earlier SLEPc, a modern C implementation of various sparse solvers
 (eigenvalues, but also linear systems, SVD, etc.). As is typical of complex
-software, installing those libraries from sources with python bindings is a
+software, installing those libraries from sources with Python bindings is a
 major PITA.
 
 Instead, I asked claude code to install SLEPc in a virtualenv and write down
@@ -303,21 +304,26 @@ and also
 ---
 
 ```
-Step 4: Convergence Check
+#### 2e. Compute restart size $l$
 
-Line 288
+[Lines 294–298](https://gitlab.com/slepc/slepc/-/blob/2435073368006cab65837fb206144f409508c908/src/eps/impls/krylov/krylovschur/krylovschur.c#L294)
 
-PetscCall(EPSKrylovConvergence(eps, PETSC_FALSE, eps->nconv, nv-eps->nconv,
-                               beta, 0.0, gamma, &k));
+If converged or breakdown: $l \leftarrow 0$.
 
-For each Ritz pair
-where is the -th column of , the residual norm estimate is computed cheaply as:
+Otherwise:
 
-which requires only the last component of each Schur vector (implemented in epskrylov.c:208). A pair is declared converged when
-(relative criterion) or similar user-selected criterion.
+$$
+l \leftarrow \max\!\Big(1,\ \big\lfloor (m - k) \cdot \rho \big\rfloor\Big)
+$$
 
-The number of converged pairs is returned.
+For the non-Hermitian case, `DSGetTruncateSize` adjusts $l$ by $\pm 1$ to avoid splitting a $2 \times 2$ real Schur block (which encodes a complex conjugate pair):
+
+l = PetscMax(1,(PetscInt)((nv-k)*ctx->keep));
+if (!hermitian) PetscCall(DSGetTruncateSize(eps->ds,k,nv,&l));
+
+For the non-locking variant ([line 299](https://gitlab.com/slepc/slepc/-/blob/2435073368006cab65837fb206144f409508c908/src/eps/impls/krylov/krylovschur/krylovschur.c#L299)): $l \leftarrow l + k$, $k \leftarrow 0$.
 ```
+
 ---
 
 This completely blew my mind. In particular, the main algorithm description has
@@ -336,17 +342,19 @@ at generating math through LaTeX.
 was trying to reproduce the output without success until I realized I was using
 a weak model.
 
-## Conlusion
+## Conclusion
 
-1. Start using a coding agent now. You don't need configuration to start using
-   it. Seeing and using is believing
-2. Start use it for scripting, one-off actions, things you know how to do by
-   hand so that you can verify the output, and are drudgery.
-3. Leverage the agentic loop: give it a task that can be done by looping over a
-   well setup (e.g. a script). Then it can do the work for you in the background
-4. It is not useful only for writing code, but also to interact with code:
-   understand a codebase, ask specific implementation questions, review your
-   code
+1. Start using coding agents now. If you don't code much, start by using it for
+   scripting, one-off actions, things you know how to do
+   by hand so that you can verify the output.
+2. Leverage the agentic loop: give it a task that can be done by looping over a
+   well-defined setup with clear fail/success criteria (e.g. a script). Then it
+   can do the work for you in the background. This was the most revealing
+   aspect of agentic coding for me, and when it started to feel like "magic"
+3. It is not useful only for writing code, but also for interacting with code:
+   understanding a codebase, asking specific implementation questions,
+   reviewing your code. Keep your critical sense in those cases, and avoid
+   generic questions
 
 ## Notes and references
 
@@ -370,23 +378,6 @@ libraries are full of goto and other constructs used when for loops were not
 common. [Example](https://github.com/scipy/scipy/blob/6e246d0b54dd55dc69232a0caae6772228a7ac25/scipy/integrate/odepack/lsoda.f) if you want to be scared.
 
 ## Some background on sparse eigen decomposition
-
-### eigen decomposition and its applications
-
-Why is this useful?
-
-1. Used to find low rank approximation of large matrices:
-   1. PCA in data analysis
-   2. non-negative matrix factorization, e.g. for collaborative filtering
-     (recommendation)
-   3. spectral clustering (used in scikit learn)
-2. Network analysis
-   1. Graph Laplacian: the second smallest eigenvalue of the graph Laplacian is
-   0 iff the graph is disconnected
-   2. Random walk: PageRank (Google's original algorithm) finds the stationary
-   distribution of a random walk via the dominant eigenvector of the
-   transition matrix
-3. Many more applications in physics, etc.
 
 ### Eigen solver, sparse matrices
 
