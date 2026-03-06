@@ -10,14 +10,17 @@
    eigenpairs and SVD of large, sparse systems (millions of rows, thousands of
    parameters), and also a bit of history.
 
-As a preview "aha" moment of agentic coding: for a 3rd party OSS library
-implementing in C the algorithm I was interested in, I could generate in
-minutes a 15-page document describing the relevant implementation step by
-step, with annotated source code. All I had to do was clone the repo locally
-and describe in a few sentences what details I wanted, including potential
-extensions not yet implemented. The generated document
-contains a section-by-section description of the code, interlacing math
-explanations with it, e.g.
+### Aha moment
+
+As a preview "aha" moment of agentic coding: I was looking up some details in a
+3rd party OSS library implementing in C the algorithm I was interested in.
+Before, I would spend some time looking at the code, trying it and see if it
+was worth my time. With claude code, I could generate in minutes a 15-page
+document describing the relevant implementation step by step, with annotated
+source code. **All I had to do was clone the repo locally and describe in a few
+sentences what details I wanted, including potential extensions not yet
+implemented**. The generated document contains a section-by-section description
+of the code, interlacing math explanations with it, e.g.
 
 ---
 
@@ -77,13 +80,15 @@ In the simple case, we say $\lambda, v$ is an eigenpair for the matrix $A$ if:
 $\lambda$ is the eigenvalue, and $v$ an eigenvector. Conceptually, it means $v$
 is an invariant for $A$, i.e. $v$ stays in the same direction after applying
 the linear operator of $A$. It is closely related to Singular Value
-Decomposition (SVD).
+Decomposition (SVD). For a square matrix of size N, finding all the eigenpairs can
+be in O(N^3) (iterated QR algorithm and derivatives).
 
 Sparse eigensolvers are algorithms that can find only a few eigenpairs of a
 potentially very large, sparse matrix (non-zero entries << zeros, generally 1%
-or less). E.g. the original Netflix Prize matrix was ~20k x 500k, and the
-original "Google Matrix" of the 1998 PageRank paper was ~24 million x 24
-million.
+or less). E.g. the original "Google Matrix" of the 1998 PageRank paper was ~24
+million x 24 million matrix, but mostly 0 entries.
+
+You can do this in scipy as follows:
 
 ```python
 import numpy as np
@@ -99,12 +104,23 @@ A = sp.random(n, n, density=density)
 eigenvalues, eigenvectors = spla.eigs(A, k=2, which="LM")
 ```
 
-I had had this project for ~15 years to rewrite a better version, but never
-found the time. In 2024, my friend Stefan van der Walt reminded me of those
-discussions, and I used some downtime at the SciPy 2024 conference to try to get
-ChatGPT to give me the steps needed for a state-of-the-art implementation. One
-twist: for copyright reasons, I wanted to write the code myself, understand the
-algorithm completely, and not ask the AI to write the code for me.
+I fixed a lot of crashes in the underlying solver when I worked in scipy, but
+did not understand the methodology. Nobody in scipy really did, as the
+underlying Fortran code we used was arcane and from the 90ies. Just when I was
+graduating my PhD, there was a lot of talk in the ML community on the [Netflix
+prize](https://en.wikipedia.org/wiki/Netflix_Prize). It was about predicting
+the movie rating of users who had not watched the movie yet. It is essentially
+a collaborative filtering problem, and can be solved as a low rank estimation
+of the users x movies rating matrix (sparse SVD). At that time, the matrix was
+~ 500k x 20k matrix. Too big to hold on a grad student machine :)
+
+So I got interested in the methodology, and I had this project for ~15 years to
+rewrite a better version, but never found the time. In 2024, my friend Stefan
+van der Walt reminded me of those discussions, and I used some downtime at the
+SciPy 2024 conference to try to get ChatGPT to give me the steps needed for a
+state-of-the-art implementation. One twist: for copyright reasons, I wanted to
+write the code myself, understand the algorithm completely, and not ask the AI
+to write the code for me.
 
 So my goals were:
 
@@ -122,7 +138,7 @@ the non-boilerplate code!
 
 As a bonus, I am now familiar with the basics of sparse eigensolver methodology.
 
-### How did I use AI for this section?
+### How did I initially used ChatGPT ?
 
 First, basic "chat" use. First attempt in summer 2024, I started using ChatGPT
 for literature review: finding references and websites, and having it help me
@@ -132,15 +148,16 @@ a screenshot of a given algorithm. I would ask it to explain a given section if
 I did not understand, and to expand on it. **This helped me figure out whether this was
 feasible at all given my constraints**.
 
-Claude code also helped me find two bugs, one easy and one subtle:
+In 2025, I started using claude code also helped me find two bugs in some naive
+implementation I built to understand the algorithm, one easy and one subtle:
 
-1. Easy: 360a0e39dad3de019343656950e000d1e0b9c3b2
-2. More subtle:  985d9911bb4dfef255d0f860f576d4639a4d2635, vdot vs dot, conjugate
+1. Easy: [comparing tolerance and complex value](https://github.com/cournape/arnoldi-py/commit/360a0e39dad3de019343656950e000d1e0b9c3b2)
+2. More subtle: [failing to take the conjugate in a projection](https://github.com/cournape/arnoldi-py/commit/985d9911bb4dfef255d0f860f576d4639a4d2635#diff-ef2f4c457dc3bd3577d33af4efa3e004368796f02e907b8b91cf23c51eaf751bR13-R150)
 
 How did I find them? First one by asking claude code to review the code
 directly.
 
-Second one, more interesting: I wrote a script that reproduced the issue,
+Second one is more interesting: I wrote a script that reproduced the issue,
 printed its output, and asked claude code to find the bug by trying different
 matrices and parameters, with examples that worked and one that did not. It ran
 in an agentic mode and finally found that based on the matrix type (real vs.
@@ -174,36 +191,37 @@ compare it against the `scipy` one, both in terms of performance and accuracy. I
    in terms of precision and benchmark their timing
 3. Write a script to plot the results for easier comparison, see below
 
-![](https://private-user-images.githubusercontent.com/25111/556924723-d5c082a8-0c0a-446a-8232-2fba2467c3ad.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NzI3MjExMDIsIm5iZiI6MTc3MjcyMDgwMiwicGF0aCI6Ii8yNTExMS81NTY5MjQ3MjMtZDVjMDgyYTgtMGMwYS00NDZhLTgyMzItMmZiYTI0NjdjM2FkLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNjAzMDUlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjYwMzA1VDE0MjY0MlomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPWQ5M2ZmYmMyOTM3Yjc0Y2NjZmY5NThmZTg3NjZhMTdjMTZjNDhjNDM3NTAxYWMwZDJjYWZiOThlNzdlYWVmYTYmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.VtKR6yaKAnGKehJ4eYZw5kZG4ncVria_nGG90fmgEN0)
+![](https://private-user-images.githubusercontent.com/25111/556924723-d5c082a8-0c0a-446a-8232-2fba2467c3ad.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NzI3Njk1NzIsIm5iZiI6MTc3Mjc2OTI3MiwicGF0aCI6Ii8yNTExMS81NTY5MjQ3MjMtZDVjMDgyYTgtMGMwYS00NDZhLTgyMzItMmZiYTI0NjdjM2FkLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNjAzMDYlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjYwMzA2VDAzNTQzMlomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPWNjYjk5Mjc2YzA4MjNjOWI1YTgzMjFjY2I0ZTk5YjYxNWEyN2RhYTg1OGJlMmU5Mjc1ZTc4ZDdiNzRkMDA2MTMmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.j5bTz528COUXcovt6uySVcruuGz9SYGtAgo6hTrmaR0)
 
 Now, [those](https://github.com/cournape/arnoldi-py/blob/main/scripts/plot-stress-test.py) [scripts](https://github.com/cournape/arnoldi-py/blob/main/scripts/stress-test.py) are fairly trivial, but it would have easily taken me 1h+ to write them.
 
 ### Automatically figuring out how to install complex libraries
 
-I mentioned earlier SLEPc, a modern C implementation of various sparse solvers
-(eigenvalues, but also linear systems, SVD, etc.). As is typical of complex
-software, installing those libraries from sources with Python bindings is a
-major PITA.
+SLEPc is a modern C implementation of various sparse solvers (eigenvalues, but
+also linear systems, SVD, etc.). I wanted to use it as a benchmark (speed and
+precision). As is typical of complex software, installing those libraries from
+sources with Python bindings is a major PITA.
 
-Instead, I asked claude code to install SLEPc in a virtualenv and write down
-the instructions once it had figured it out. For security reasons (downloading
-and installing from the internet) I did this in a temporary VM. After ~20
-mins, it produced [the instructions](https://github.com/cournape/arnoldi-py/blob/main/scripts/INSTALL_SLEPC.md)
+Instead of figuring this out, I asked claude code to install SLEPc in a
+virtualenv and write down the instructions once it had done it. **I defined
+done by correct execution of a script that imports those libraries**. For
+security reasons (downloading and installing from the internet) I did this in a
+temporary VM. After ~20 mins, it produced [the
+instructions](https://github.com/cournape/arnoldi-py/blob/main/scripts/INSTALL_SLEPC.md)
 
 Now, as a former build engineer, I know how to do this, but it would again
-easily have taken me 1+ hour to figure it out, given the compilation time and
-the weird incompatibilities. Also note that it figured out automatically how to
-use the right environment variables (easy enough), and the right version of
-Cython, since the latest Cython is not compatible with the source code (it
-figured this out from the build output).
+easily have taken me 1+ hour to figure it out, maybe more given the compilation
+time and the weird incompatibilities. Also note that it figured out
+automatically how to use the right environment variables (easy enough), and the
+right version of Cython, since the latest Cython is not compatible with the
+source code (it figured this out from the build output).
 
 ### Help writing tests
 
-Generally, I find CC not so good at writing unit tests when directed from an existing
-implementation. It will often generate trivial code, mock unnecessarily, etc.
-Instead, I asked CC to confirm the important invariants to check: V orthonormal,
-equality of $A V - H V$ and approximate residuals, etc. Then I wrote [the tests
-based on those
+Generally, I find CC not so good at writing unit tests when directed from an
+existing implementation. It will often generate trivial code, mock
+unnecessarily, etc. Instead, **I asked CC to confirm the important invariants
+to check**, and then I wrote [the tests based on those
 invariants](https://github.com/cournape/arnoldi-py/blob/main/tests/test_decomposition.py#L36),
 though CC could of course have generated those itself.
 
@@ -211,12 +229,13 @@ though CC could of course have generated those itself.
 will result in bad tests. Think "write specifications of the tests", then
 review, then ask CC to write tests from the specifications to check.
 
-**Note**: this is a key principle of successful agent/LLM usage, agentic coding or
-otherwise. Those tools are really good when checking a solution can be done more
-easily or faster than finding one, because then agents can loop in the
-background and figure it out by themselves. If, however, it is very difficult to
-check the LLM output, and even more so at scale, then LLMs will most likely not
-work very well. There are similarities to LLM/agent evals.
+**Note**: this is a key principle of successful agent/LLM usage, agentic coding
+or otherwise. Those tools are really good when checking a solution can be done
+more easily or faster than finding one, because then agents can loop in the
+background and figure it out by themselves. If, however, it is very difficult
+to check the LLM output, and even more so at scale, then LLMs will most likely
+not work very well. There are similarities to LLM/agent evals, and the
+principle of [wicked problems](https://en.wikipedia.org/wiki/Wicked_problem).
 
 ### Finding another non-trivial convergence bug
 
@@ -299,32 +318,7 @@ Output: Converged Ritz pairs (λ̃ᵢ, ṽᵢ)
 
 ---
 
-and also
-
----
-
-```
-#### 2e. Compute restart size $l$
-
-[Lines 294–298](https://gitlab.com/slepc/slepc/-/blob/2435073368006cab65837fb206144f409508c908/src/eps/impls/krylov/krylovschur/krylovschur.c#L294)
-
-If converged or breakdown: $l \leftarrow 0$.
-
-Otherwise:
-
-$$
-l \leftarrow \max\!\Big(1,\ \big\lfloor (m - k) \cdot \rho \big\rfloor\Big)
-$$
-
-For the non-Hermitian case, `DSGetTruncateSize` adjusts $l$ by $\pm 1$ to avoid splitting a $2 \times 2$ real Schur block (which encodes a complex conjugate pair):
-
-l = PetscMax(1,(PetscInt)((nv-k)*ctx->keep));
-if (!hermitian) PetscCall(DSGetTruncateSize(eps->ds,k,nv,&l));
-
-For the non-locking variant ([line 299](https://gitlab.com/slepc/slepc/-/blob/2435073368006cab65837fb206144f409508c908/src/eps/impls/krylov/krylovschur/krylovschur.c#L299)): $l \leftarrow l + k$, $k \leftarrow 0$.
-```
-
----
+and also this html output (note: show live, can't easily embed here)
 
 This completely blew my mind. In particular, the main algorithm description has
 more details than the technical report (exact convergence criteria, exact logic
@@ -341,6 +335,20 @@ at generating math through LaTeX.
 **Note**: in this specific case, you definitely want to use OPUS, not sonnet. I
 was trying to reproduce the output without success until I realized I was using
 a weak model.
+
+### Finding optimization based on memory layout
+
+When asked how to make the implementation faster, it found multiple irrelevant
+issues, but its first finding was [this memory layout optimization that speed
+the running time by
+3x](https://github.com/cournape/arnoldi-py/commit/6ac82b119f20568fa524ad0e1d9eb26aa7208e2d)
+
+This is actually something I knew I had to do but forgot. This is a non trivial
+finding, because the suggestion is contextual (only make sense when $m \ll n$),
+and you need to be familiar with memory vs CPU bound, optimizing memory access,
+etc.
+
+By the way, do you know what this does and why it makes things faster ?
 
 ## Conclusion
 
